@@ -6,7 +6,7 @@ import {
   Text,
   View,
   TextInput,
-  Dimensions,
+  Dimensions, // This is already imported, which is great
   Pressable,
   KeyboardAvoidingView,
   ScrollView,
@@ -14,9 +14,7 @@ import {
 } from 'react-native';
 
 import auth from '@react-native-firebase/auth';
-// ✅ IMPORT UNCOMMENTED
 // import {useNavigation, NavigationProp} from '@react-navigation/native';
-// // ✅ Make sure this import points to your types file
 // import {RootStackParamList} from '../types/navigation';
 import Svg, {Image as SvgImage, Ellipse, ClipPath} from 'react-native-svg';
 import Animated, {
@@ -38,14 +36,9 @@ const LoginPage = () => {
   const [isSigningUp, setIsSigningUp] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  // ✅ NAVIGATION HOOK UNCOMMENTED
   // const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
-  // ... (Your useEffect listeners are still commented out, that's fine for now) ...
-
   // ---------------- FIREBASE HANDLERS ----------------
-
-  // ✅ THIS FUNCTION IS MODIFIED
   const handleSignUp = async () => {
     setIsSigningUp(true);
     try {
@@ -53,18 +46,7 @@ const LoginPage = () => {
         email,
         password,
       );
-
-      // 1. Save the fullName to the user's profile
       await userCredential.user.updateProfile({ displayName: fullName });
-
-      // 2. ✅ REMOVE THE NAVIGATION LINE
-      // navigation.navigate('RoleSelection'); 
-      
-      // That's it!
-      // Your App.tsx logic will now take over. It will see the new
-      // user, check for a role (find 'null'), and automatically
-      // show the RoleSelection screen.
-
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         Alert.alert('That email address is already in use!');
@@ -82,7 +64,6 @@ const LoginPage = () => {
     setIsSigningIn(true);
     try {
       await auth().signInWithEmailAndPassword(email, password);
-      // 🚀 No navigation here → listener handles it (This is correct)
     } catch (error: any) {
       if (
         error.code === 'auth/user-not-found' ||
@@ -98,16 +79,18 @@ const LoginPage = () => {
   };
 
   // ---------------- ANIMATIONS ----------------
-  // (All your animation code is untouched)
   const {height, width} = Dimensions.get('window');
   const imagePosition = useSharedValue(1);
   const formButtonScale = useSharedValue(1);
 
   const imageAnimatedStyle = useAnimatedStyle(() => {
+
+    const IS_SMALL_SCREEN = height < 700;
     const interpolation = interpolate(
       imagePosition.value,
-      [0, 1],
-      [-height / 2, 0],
+      [0, (IS_SMALL_SCREEN ? 1.2 : 1)],
+      // ✅ FIX: Wrap the ternary operator in parentheses ()
+      [-height / (IS_SMALL_SCREEN ? 1.8 : 2), 0],
     );
     return {
       transform: [{translateY: withTiming(interpolation, {duration: 1500})}],
@@ -148,7 +131,6 @@ const LoginPage = () => {
   });
 
   // ---------------- UI ACTIONS ----------------
-  // (All your UI action code is untouched)
   const loginHandler = () => {
     imagePosition.value = 0;
     if (isRegistering) {
@@ -171,7 +153,6 @@ const LoginPage = () => {
   };
 
   // ---------------- RENDER ----------------
-  // (Your entire render method is untouched)
   return (
     <KeyboardAvoidingView
       style={{flex: 1}}
@@ -276,8 +257,13 @@ const LoginPage = () => {
   );
 };
 
-// (All your style code is untouched)
+// ---------------- STYLES ----------------
 const {height} = Dimensions.get('window');
+// ✅ -- FIX 1: Check the screen height --
+// The iPhone SE (3rd gen) has a height of 667.
+// We'll use 700 as a safe breakpoint.
+const IS_SMALL_SCREEN = height < 700;
+
 const styles = StyleSheet.create({
   container: {flex: 1, justifyContent: 'flex-end'},
   button: {
@@ -345,7 +331,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     alignItems: 'center',
     borderRadius: 20,
-    top: -20,
+    // ✅ -- FIX 2: Use the responsive value --
+    // On small screens, use a smaller offset (-40)
+    // On tall screens, use your original offset (-60)
+    top: IS_SMALL_SCREEN ? -25 : -20,
   },
 });
 

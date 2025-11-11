@@ -3,42 +3,47 @@ import {View, Text, Button, StyleSheet, Alert} from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 
-// ✅ 1. Import navigation types
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types/navigation';
 
-// ✅ 2. Define the navigation props for this screen
 type NavigationScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'RoleSelection'
 >;
 
-// ✅ 3. Define your custom props
 type CustomProps = {
   onRoleSelected: (role: 'student' | 'counselor') => void;
 };
 
-// ✅ 4. Combine them into one type
 type RoleSelectionProps = NavigationScreenProps & CustomProps;
 
-// ✅ 5. Use the new type here. We only destructure onRoleSelected
-//    because that's all we're using from the props.
 const RoleSelection = ({ onRoleSelected }: RoleSelectionProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const user = auth().currentUser;
-  const uid = user?.uid;
-  const email = user?.email;
-  const fullName = user?.displayName;
+  // --- FIX: We don't need these variables here anymore ---
+  // const user = auth().currentUser; // <-- DELETE
+  // const uid = user?.uid; // <-- DELETE
+  // const email = user?.email; // <-- DELETE
+  // const fullName = user?.displayName; // <-- DELETE
 
   const handleSelectRole = async (role: 'student' | 'counselor') => {
-    if (!uid) {
-      Alert.alert('Error', 'User not found. Please log in again.');
-      return;
-    }
     if (isLoading) {
       return;
     }
     setIsLoading(true);
+
+    // --- We get the user data *only* when the button is pressed ---
+    const user = auth().currentUser;
+
+    if (!user) {
+      Alert.alert('Error', 'User not found. Please log in again.');
+      setIsLoading(false);
+      return;
+    }
+
+    // These variables now only exist inside this function
+    const uid = user.uid;
+    const email = user.email;
+    const fullName = user.displayName;
 
     const collection = role === 'student' ? 'students' : 'counselors';
 
@@ -50,7 +55,6 @@ const RoleSelection = ({ onRoleSelected }: RoleSelectionProps) => {
         role: role,
       });
 
-      // Tell the parent (App.tsx) what just happened
       onRoleSelected(role);
 
     } catch (error) {
@@ -59,12 +63,13 @@ const RoleSelection = ({ onRoleSelected }: RoleSelectionProps) => {
       setIsLoading(false);
     }
   };
+  // --- We also need to get the name for the welcome message ---
+  // --- We can get it from the user object directly ---
+  const welcomeName = auth().currentUser?.displayName;
 
-  // ... (rest of your component and styles) ...
-  
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome, {fullName || 'User'}!</Text>
+      <Text style={styles.title}>Welcome, {welcomeName || 'User'}!</Text>
       <Text style={styles.subtitle}>Please select your role:</Text>
       <Button
         title={isLoading ? 'Saving...' : 'I am a Student'}

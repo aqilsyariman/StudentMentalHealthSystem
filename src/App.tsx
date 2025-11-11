@@ -11,6 +11,8 @@ import RoleSelection from './Screens/RoleSelection';
 import StudentDashboard from './Screens/StudentDashboard';
 import CounselorDashboard from './Screens/CounselorDashboard';
 import DetailsScreen from './Screens/Details';
+import ListStudent from './Screens/ListStudent';
+import StudentDetail from './Screens/StudentDetail';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -105,7 +107,11 @@ const App = () => {
               name="StudentDashboard"
               component={StudentDashboard}
             />
-            <Stack.Screen options={{headerShown:true}}name="Details" component={DetailsScreen} />
+            <Stack.Screen
+              options={{headerShown: true}}
+              name="Details"
+              component={DetailsScreen}
+            />
           </Stack.Group>
         ) : (
           // --- 4. LOGGED IN (Counselor) ---
@@ -114,7 +120,16 @@ const App = () => {
               name="CounselorDashboard"
               component={CounselorDashboard}
             />
-            <Stack.Screen name="Details" component={DetailsScreen} />
+            <Stack.Screen
+              options={{headerShown: true, title: 'List Student'}}
+              name="ListStudent"
+              component={ListStudent}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Student Details'}}
+              name="StudentDetail"
+              component={StudentDetail}
+            />
           </Stack.Group>
         )}
       </Stack.Navigator>

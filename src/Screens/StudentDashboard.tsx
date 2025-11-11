@@ -63,6 +63,7 @@ const DashboardScreen = ({ navigation }: Props) => {
     dia: number | null;
     date: string | null;
   } | null>(null);
+  
 
   useEffect(() => {
     if (!isIOS) {
