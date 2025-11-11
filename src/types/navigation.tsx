@@ -5,5 +5,6 @@ export type RootStackParamList = {
   Details: undefined;
   CounselorDashboard: undefined;
   ListStudent: undefined;
-StudentDetail: { studentId: string };
+  StudentDetail: {studentId: string};
+  AddStudentScreen: undefined;
 };

@@ -6,147 +6,198 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  ActivityIndicator, // <-- Added for loading
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
-import firestore from '@react-native-firebase/firestore'; // <-- Added Firebase
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth'; // Required for getting current user ID
 
-// --- (FIX 1: TYPES) ---
-// Define the "shape" of your data
+// --- TYPES (Assumed Correct) ---
 type StudentStatus = 'At Risk' | 'Needs Check-in' | 'Stable';
 
 type Student = {
-  id: string; // This will be the document ID
+  id: string;
   name: string;
   email: string;
   status: StudentStatus;
-  avatar: string; // Assuming 'avatar' is a field in your doc
+  avatar: string;
+  counselorId: string | null;
 };
 
-// --- Helper function to get colors for status ---
-// (FIX 2: Add type for status)
+type CounselorMap = {
+  [id: string]: string;
+};
+
+// --- Helper function to get colors for status (Assumed Correct) ---
 const getStatusStyles = (status: StudentStatus) => {
   switch (status) {
     case 'At Risk':
-      return {
-        backgroundColor: '#f8e3e3ff',
-        color: '#f15252ff',
-      };
+      return {backgroundColor: '#f8e3e3ff', color: '#f15252ff'};
     case 'Needs Check-in':
-      return {
-        backgroundColor: '#fef9e6',
-        color: '#FFA500',
-      };
+      return {backgroundColor: '#fef9e6', color: '#FFA500'};
     case 'Stable':
     default:
-      return {
-        backgroundColor: '#dff6dfff',
-        color: '#489448ff',
-      };
+      return {backgroundColor: '#dff6dfff', color: '#489448ff'};
   }
 };
 
-// (FIX 3: Add navigation prop)
-// We will use 'any' for simplicity, but you can get
-// the proper type from React Navigation if you want
 const ListStudent = ({navigation}: {navigation: any}) => {
-  // --- (FIX 4: STATE MANAGEMENT) ---
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [counselorMap, setCounselorMap] = useState<CounselorMap>({});
 
-  // --- (FIX 5: DATA FETCHING) ---
+  // --- DATA FETCHING (Filtered by Counselor ID) ---
   useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const studentList: Student[] = [];
-        const snapshot = await firestore().collection('students').get();
+    const fetchAllData = async () => {
+      // Get the currently logged-in counselor's ID
+      const currentCounselorId = auth().currentUser?.uid;
+      
+      if (!currentCounselorId) {
+        console.error("No user logged in to fetch assigned students.");
+        setLoading(false);
+        return; 
+      }
 
-        snapshot.forEach(doc => {
-          // Get data and add the document ID
+      try {
+        // 1. Fetch Counselors (needed for the name map)
+        const counselorPromise = firestore().collection('counselors').get(); 
+
+        // 2. QUERY: Filter students where counselorId matches the current user's ID
+        const studentQuery = firestore()
+          .collection('students')
+          .where('counselorId', '==', currentCounselorId) 
+          .get(); 
+
+        // 3. Wait for both to finish
+        const [studentSnapshot, counselorSnapshot] = await Promise.all([
+          studentQuery, 
+          counselorPromise, 
+        ]);
+
+        // 4. Process Counselors into a "Map"
+        const newCounselorMap: CounselorMap = {};
+        counselorSnapshot.forEach(doc => {
+          newCounselorMap[doc.id] = doc.data().fullName || 'Unnamed Counselor';
+        });
+        setCounselorMap(newCounselorMap);
+
+        // 5. Process Students
+        const studentList: Student[] = [];
+        studentSnapshot.forEach(doc => {
           const data = doc.data();
           studentList.push({
             id: doc.id,
-            name: data.fullName || 'No Name', // Add fallbacks
+            name: data.fullName || 'No Name',
             email: data.email || 'No Email',
             status: data.status || 'Stable',
             avatar: data.avatar || '',
+            counselorId: data.counselorId || null,
           });
         });
 
         setStudents(studentList);
+        setFilteredStudents(studentList);
       } catch (error) {
-        console.error('Error fetching students: ', error);
-        // You could add an error state here
+        console.error('Error fetching assigned students: ', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStudents();
-  }, []); // Empty array means this runs once on mount
+    fetchAllData();
+  }, []);
 
-  // --- (FIX 6: PRESS HANDLERS) ---
-  // const handleBackPress = () => {
-  //   if (navigation) {
-  //     navigation.goBack(); // <-- Go back to Dashboard
-  //   }
-  // };
+  // --- CLIENT-SIDE SEARCH FILTERING ---
+  useEffect(() => {
+    if (searchQuery === '') {
+      setFilteredStudents(students);
+    } else {
+      const lowerCaseQuery = searchQuery.toLowerCase();
+      const filtered = students.filter(
+        student =>
+          // Filter by student name or counselor name (if student has one)
+          student.name.toLowerCase().includes(lowerCaseQuery) ||
+          (student.counselorId && 
+            counselorMap[student.counselorId]
+              ?.toLowerCase()
+              .includes(lowerCaseQuery)),
+      );
+      setFilteredStudents(filtered);
+    }
+  }, [searchQuery, students, counselorMap]); 
 
-  // (FIX 2: Add type for student)
   const handleStudentPress = (student: Student) => {
-    console.log('Navigate to student details for:', student.name);
     if (navigation) {
-      // Navigate to a detail screen, passing the student's ID
-      navigation.navigate('StudentDetail', {studentId: student.id});
+      // Assumes 'StudentDetail' route exists and accepts 'studentId'
+      navigation.navigate('StudentDetail', {studentId: student.id}); 
     }
   };
 
-  // --- (FIX 7: LOADING UI) ---
   if (loading) {
     return (
       <View style={[styles.fullContainer, styles.centerContainer]}>
         <ActivityIndicator size="large" color="#6f5be1ff" />
-        <Text style={styles.loadingText}>Loading Students...</Text>
+        <Text style={styles.loadingText}>Loading Data...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.fullContainer}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* --- HEADER --- */}
-        {/* (FIX 6: Added Back Button) */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled">
+        
+        <Text style={styles.appTitle}>My Assigned Students</Text>
 
-        <Text style={styles.appTitle}>All Students</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search by student or counselor..."
+          placeholderTextColor="#8a8a8a"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
 
-        {/* --- (FIX 8: RENDER LIVE DATA) --- */}
         {students.length === 0 ? (
-          <Text style={styles.loadingText}>No students found.</Text>
+          <Text style={styles.loadingText}>No assigned students found.</Text>
+        ) : filteredStudents.length === 0 ? (
+          <Text style={styles.loadingText}>
+            No students match "{searchQuery}"
+          </Text>
         ) : (
-          students.map(student => {
+          filteredStudents.map(student => {
             const statusStyles = getStatusStyles(student.status);
+
+            const counselorName = student.counselorId
+              ? counselorMap[student.counselorId] || 'Unknown Counselor'
+              : 'Unassigned'; // This should always show the current counselor
+
             return (
               <TouchableOpacity
                 key={student.id}
-                style={styles.card} // Re-using your card style
+                style={styles.card}
                 onPress={() => handleStudentPress(student)}
                 activeOpacity={0.7}>
                 <View style={styles.studentItemContainer}>
-                  {/* Avatar */}
                   <Image
                     style={styles.avatar}
-                    source={{
-                      // Using a placeholder avatar, you can change this
-                      uri: `https://i.pravatar.cc/100?u=${student.email}`,
-                    }}
+                    source={{uri: `https://i.pravatar.cc/100?u=${student.email}`}}
                   />
 
-                  {/* Info */}
                   <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{student.name}</Text>
                     <Text style={styles.studentEmail}>{student.email}</Text>
+                    
+                    <Text style={[
+                        styles.counselorName,
+                        { color: student.counselorId ? '#6f5be1ff' : '#888' }
+                    ]}>
+                      {counselorName}
+                    </Text>
                   </View>
 
-                  {/* Status Tag */}
                   <View
                     style={[
                       styles.statusTag,
@@ -172,7 +223,6 @@ const ListStudent = ({navigation}: {navigation: any}) => {
 
 const styles = StyleSheet.create({
   fullContainer: {flex: 1, backgroundColor: '#d3dbf5ff'},
-  // --- NEW STYLES ---
   centerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -181,8 +231,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#555',
+    textAlign: 'center',
   },
-  // ---
   scrollContainer: {padding: 20, paddingBottom: 80},
   appTitle: {
     fontSize: 30,
@@ -193,22 +243,19 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     letterSpacing: 1,
   },
-  welcomeUser: {
-    fontSize: 35,
-    color: '#482ce7ff',
-    fontWeight: '800',
-    marginTop: 100,
-    textAlign: 'left',
-  },
-  backButton: {
-    marginTop: 50,
-    marginBottom: 10,
-    alignSelf: 'flex-start',
-  },
-  backButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6f5be1ff',
+  searchInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    fontSize: 16,
+    color: '#333',
+    shadowColor: '#7B68EE',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 6,
   },
   studentItemContainer: {
     flexDirection: 'row',
@@ -220,7 +267,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 15,
-    backgroundColor: '#ddd', // Added a background for the placeholder
+    backgroundColor: '#ddd',
   },
   studentInfo: {
     flex: 1,
@@ -234,6 +281,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#777',
     marginTop: 2,
+  },
+  counselorName: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
   },
   statusTag: {
     borderRadius: 12,
@@ -256,7 +308,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  // (Omitted unused styles for brevity)
 });
 
 export default ListStudent;

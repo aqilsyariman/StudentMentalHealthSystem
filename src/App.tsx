@@ -13,21 +13,17 @@ import CounselorDashboard from './Screens/CounselorDashboard';
 import DetailsScreen from './Screens/Details';
 import ListStudent from './Screens/ListStudent';
 import StudentDetail from './Screens/StudentDetail';
+import AddStudentScreen from './Screens/AddStudentScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
-  // 1. Get auth state (is auth ready? who is the user?)
   const {user, initializing: authInitializing} = useAuth();
-
-  // 2. Create local state to hold the role
   const [role, setRole] = useState<string | null>(null);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
 
-  // 3. This effect checks the user's role AFTER they log in
   useEffect(() => {
     if (user) {
-      // User is logged in, so let's check their role in Firestore
       setIsRoleLoading(true);
 
       const checkRole = async () => {
@@ -47,34 +43,41 @@ const App = () => {
               .collection('counselors')
               .doc(user.uid)
               .get();
-            if (counselorDoc.exists()) {
+            
+            // --- (THIS IS THE FIX) ---
+            // Don't just check if the doc exists.
+            // Check the 'role' field INSIDE the document.
+            if (counselorDoc.exists() && counselorDoc.data()?.role === 'counselor') {
               userRole = 'counselor';
+            } else if (counselorDoc.exists()) {
+              // User is in the counselor collection but NOT an active counselor
+              // (e.g., role: 'pending'), so they have no role for now.
+              userRole = null; 
             }
+            // --- (END OF FIX) ---
           }
+          
           setRole(userRole);
         } catch (error) {
           console.error('App.tsx: Error checking user role: ', error);
           setRole(null);
         } finally {
-          setIsRoleLoading(false); // We're done checking
+          setIsRoleLoading(false);
         }
       };
       checkRole();
     } else {
-      // User is logged out, so clear the role and stop loading
       setRole(null);
       setIsRoleLoading(false);
     }
-  }, [user]); // This runs every time the 'user' object changes
+  }, [user]);
 
-  // 4. Show a loading screen if EITHER auth OR role is loading
   const isInitializing = authInitializing || isRoleLoading;
 
   if (isInitializing) {
     return null; // Or your custom Splash Screen component
   }
 
-  // 5. This logic is now perfect. No "flash" will happen.
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{headerShown: false}}>
@@ -88,10 +91,10 @@ const App = () => {
           <Stack.Group>
             <Stack.Screen name="RoleSelection">
               {(
-                props, // 'props' here contains navigation and route
+                props,
               ) => (
                 <RoleSelection
-                  {...props} // ✅ <-- ADD THIS LINE
+                  {...props} 
                   onRoleSelected={newRole => {
                     setRole(newRole);
                     setIsRoleLoading(false);
@@ -129,6 +132,11 @@ const App = () => {
               options={{headerShown: true, title: 'Student Details'}}
               name="StudentDetail"
               component={StudentDetail}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Add Student'}}
+              name="AddStudentScreen"
+              component={AddStudentScreen}
             />
           </Stack.Group>
         )}

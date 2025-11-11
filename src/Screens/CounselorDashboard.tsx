@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Svg, {Path, G, Rect} from 'react-native-svg';
-import auth from '@react-native-firebase/auth';
+import auth from '@react-native-firebase/auth'; // <-- Needed for user ID
 import firestore from '@react-native-firebase/firestore';
 import { RootStackParamList } from '../types/navigation';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 // --- Icon Component (Added) ---
 // This is the "warning" icon you provided
@@ -71,10 +72,23 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CounselorDashboard'>;
 const CounselorDashboard = ({ navigation }: Props) => {
   const [activeStudents, setActiveStudents] = useState<number | null>(null);
 
-  useEffect(() => {
+  useFocusEffect(() => {
     const fetchStudentCount = async () => {
+      // 1. Get the current user's ID
+      const currentCounselorId = auth().currentUser?.uid;
+
+      if (!currentCounselorId) {
+        setActiveStudents(0);
+        return;
+      }
+
       try {
-        const snapshot = await firestore().collection('students').get();
+        // 2. Query Firestore and filter by the counselorId field
+        const snapshot = await firestore()
+          .collection('students')
+          .where('counselorId', '==', currentCounselorId) // <-- KEY FILTER
+          .get();
+          
         setActiveStudents(snapshot.size);
       } catch (error) {
         console.error('Error fetching student count: ', error);
@@ -83,7 +97,7 @@ const CounselorDashboard = ({ navigation }: Props) => {
     };
 
     fetchStudentCount();
-  }, []);
+  }, ); // Depend on auth state implicitly
 
   return (
     <View style={styles.fullContainer}>
@@ -93,12 +107,11 @@ const CounselorDashboard = ({ navigation }: Props) => {
         </View>
         <Text style={styles.appTitle}>Student Support Hub</Text>
         <View>
-          {/* --- Active Student Card (Existing) --- */}
-          <Card>
-            <TouchableOpacity onPress={() => navigation.navigate('ListStudent')} style={styles.cardContainerColumn}>
+          {/* --- Active Student Card (MODIFIED: Now shows assigned count) --- */}
+          <Card onPress={() => navigation.navigate('ListStudent')}>
+            <View style={styles.cardContainerColumn}>
               <Svg width={80} height={80} viewBox="0 0 200 200">
                 {/* Circle background (Keep this, it's fine) */}
-
                 <G fill="#4b84abff" scale="0.4" x={20} y={30}>
                   <Path
                     d="M363.663,294.916c0-18.823-13.48-34.545-31.289-38.05v-25.655c0-2.333-1.086-4.534-2.938-5.953
@@ -140,7 +153,7 @@ const CounselorDashboard = ({ navigation }: Props) => {
                 />
                 <Text style={styles.titleText}>+2 This month</Text>
               </View>
-            </TouchableOpacity>
+            </View>
           </Card>
           <Card>
             <View style={styles.cardContainerColumn}>
@@ -260,8 +273,14 @@ const CounselorDashboard = ({ navigation }: Props) => {
           {/* --- Quick Actions Card (Existing) --- */}
           <Card title="Quick Actions">
             <View style={styles.gridContainer}>
-              {/* Box 1 */}
-              <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+              
+              {/* --- Box 1 (MODIFIED for Add Student) --- */}
+              <TouchableOpacity 
+                style={styles.boxWrapper} 
+                activeOpacity={0.7}
+                // --- THIS IS THE NAVIGATION YOU ASKED FOR ---
+                onPress={() => navigation.navigate('AddStudentScreen')} 
+              >
                 <View style={[styles.box, styles.box1]}>
                   {/* ... (plus icon) ... */}
                   <Svg width={35} height={35} viewBox="0 0 200 200">
@@ -276,7 +295,8 @@ const CounselorDashboard = ({ navigation }: Props) => {
                       <Path d="M6 12H18M12 6V18" />
                     </G>
                   </Svg>
-                  <Text style={styles.box1}>New Session</Text>
+                  {/* --- TEXT CHANGED --- */}
+                  <Text style={styles.box1}>Add Student</Text> 
                 </View>
               </TouchableOpacity>
 
@@ -473,7 +493,7 @@ const Card = ({
     style={styles.card}
     onPress={onPress} // 3. Pass the onPress prop here
     disabled={!onPress} // 4. (Good practice) Disable touch if no onPress is provided
-    activeOpacity={onPress ? 0 : 1.0} // (Good practice) Only show feedback if pressable
+    activeOpacity={onPress ? 0.7 : 1.0} // (Good practice) Only show feedback if pressable
   >
     {title && <Text style={styles.cardTitle}>{title}</Text>}
     {children}
