@@ -19,11 +19,6 @@ type RoleSelectionProps = NavigationScreenProps & CustomProps;
 
 const RoleSelection = ({ onRoleSelected }: RoleSelectionProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  // --- FIX: We don't need these variables here anymore ---
-  // const user = auth().currentUser; // <-- DELETE
-  // const uid = user?.uid; // <-- DELETE
-  // const email = user?.email; // <-- DELETE
-  // const fullName = user?.displayName; // <-- DELETE
 
   const handleSelectRole = async (role: 'student' | 'counselor') => {
     if (isLoading) {
@@ -40,7 +35,7 @@ const RoleSelection = ({ onRoleSelected }: RoleSelectionProps) => {
       return;
     }
 
-    // These variables now only exist inside this function
+    // variables
     const uid = user.uid;
     const email = user.email;
     const fullName = user.displayName;
@@ -63,8 +58,7 @@ const RoleSelection = ({ onRoleSelected }: RoleSelectionProps) => {
       setIsLoading(false);
     }
   };
-  // --- We also need to get the name for the welcome message ---
-  // --- We can get it from the user object directly ---
+
   const welcomeName = auth().currentUser?.displayName;
 
   return (

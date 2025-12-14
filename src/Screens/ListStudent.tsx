@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -53,27 +54,27 @@ const ListStudent = ({navigation}: {navigation: any}) => {
     const fetchAllData = async () => {
       // Get the currently logged-in counselor's ID
       const currentCounselorId = auth().currentUser?.uid;
-      
+
       if (!currentCounselorId) {
-        console.error("No user logged in to fetch assigned students.");
+        console.error('No user logged in to fetch assigned students.');
         setLoading(false);
-        return; 
+        return;
       }
 
       try {
         // 1. Fetch Counselors (needed for the name map)
-        const counselorPromise = firestore().collection('counselors').get(); 
+        const counselorPromise = firestore().collection('counselors').get();
 
         // 2. QUERY: Filter students where counselorId matches the current user's ID
         const studentQuery = firestore()
           .collection('students')
-          .where('counselorId', '==', currentCounselorId) 
-          .get(); 
+          .where('counselorId', '==', currentCounselorId)
+          .get();
 
         // 3. Wait for both to finish
         const [studentSnapshot, counselorSnapshot] = await Promise.all([
-          studentQuery, 
-          counselorPromise, 
+          studentQuery,
+          counselorPromise,
         ]);
 
         // 4. Process Counselors into a "Map"
@@ -119,19 +120,19 @@ const ListStudent = ({navigation}: {navigation: any}) => {
         student =>
           // Filter by student name or counselor name (if student has one)
           student.name.toLowerCase().includes(lowerCaseQuery) ||
-          (student.counselorId && 
+          (student.counselorId &&
             counselorMap[student.counselorId]
               ?.toLowerCase()
               .includes(lowerCaseQuery)),
       );
       setFilteredStudents(filtered);
     }
-  }, [searchQuery, students, counselorMap]); 
+  }, [searchQuery, students, counselorMap]);
 
   const handleStudentPress = (student: Student) => {
     if (navigation) {
       // Assumes 'StudentDetail' route exists and accepts 'studentId'
-      navigation.navigate('StudentDetail', {studentId: student.id}); 
+      navigation.navigate('StudentDetail', {studentId: student.id});
     }
   };
 
@@ -149,7 +150,7 @@ const ListStudent = ({navigation}: {navigation: any}) => {
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled">
-        
+
         <Text style={styles.appTitle}>My Assigned Students</Text>
 
         <TextInput
@@ -189,10 +190,10 @@ const ListStudent = ({navigation}: {navigation: any}) => {
                   <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{student.name}</Text>
                     <Text style={styles.studentEmail}>{student.email}</Text>
-                    
+
                     <Text style={[
                         styles.counselorName,
-                        { color: student.counselorId ? '#6f5be1ff' : '#888' }
+                        { color: student.counselorId ? '#6f5be1ff' : '#888' },
                     ]}>
                       {counselorName}
                     </Text>

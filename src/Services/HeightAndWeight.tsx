@@ -53,7 +53,7 @@ export const getHeightWeightAndBMI = async ( // ✅ Made function async
     const heightOptions: HealthInputOptions = {
       unit: AppleHealthKit.Constants.Units.meter,
     };
-    
+
     // ✅ Make the innermost callback async to allow 'await'
     AppleHealthKit.getLatestHeight(heightOptions, async (err2, results2) => {
       if (!err2 && results2?.value) {

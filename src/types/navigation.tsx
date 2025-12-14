@@ -7,4 +7,6 @@ export type RootStackParamList = {
   ListStudent: undefined;
   StudentDetail: {studentId: string};
   AddStudentScreen: undefined;
+  HeartRateGraph: {studentId: string};
+  StepsGraph: {studentId: string};
 };

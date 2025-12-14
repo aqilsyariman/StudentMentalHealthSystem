@@ -1,3 +1,4 @@
+/* eslint-disable curly */
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -6,6 +7,8 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  TouchableOpacity,
+  Alert,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import Svg, {Path} from 'react-native-svg';
@@ -31,21 +34,31 @@ const StepIcon = ({color = '#6f5be1ff', size = 32}) => (
   </View>
 );
 
+// --- TrashIcon (New) ---
+const TrashIcon = ({color = '#FF6F61', size = 24}) => (
+  <View style={{width: size, height: size}}>
+    <Svg viewBox="0 0 24 24" fill={color}>
+      <Path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+    </Svg>
+  </View>
+);
+
 // --- Student type (Unchanged) ---
 type Student = {
   fullName: string;
   email: string;
   avatar?: string;
   status?: string;
+  counselorId?: string;
 };
 
-// --- ✅ CHANGE 1: Update SensorData type ---
 type SensorData = {
   heartRate: number | null;
   stepCount: number | null;
   weight: number | null;
-  heartRateTimestamp: any; // <-- New
-  stepCountTimestamp: any; // <-- New
+  height: number | null;
+  heartRateTimestamp: any;
+  stepCountTimestamp: any;
 };
 
 type StudentDetailProps = {
@@ -76,11 +89,12 @@ const getLatestSensorValue = (sensorDoc: any) => {
   return null;
 };
 
-const StudentDetail = ({route}: StudentDetailProps) => {
+const StudentDetail = ({route, navigation}: StudentDetailProps) => {
   const [student, setStudent] = useState<Student | null>(null);
   const [sensorData, setSensorData] = useState<SensorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const {studentId} = route.params;
 
@@ -112,36 +126,34 @@ const StudentDetail = ({route}: StudentDetailProps) => {
           .collection('sensorData')
           .doc('stepCount')
           .get();
-        
-        // --- ✅ FIX #1 ---
+
         const weightRef = firestore()
           .collection('students')
           .doc(studentId)
           .collection('BMIdata')
-          .doc('bodyMetrics') // Or .doc('bmi') if you changed it
-          .get(); // <-- REMOVED 'weight'
+          .doc('bodyMetrics')
+          .get();
 
         // Wait for all fetches
         const [heartRateDoc, stepCountDoc, weightDoc] = await Promise.all([
           heartRateRef,
           stepCountRef,
-          weightRef
+          weightRef,
         ]);
 
         // --- 3. Process the results ---
         const latestHeartRate = getLatestSensorValue(heartRateDoc);
         const latestStepCount = getLatestSensorValue(stepCountDoc);
-        const latestWeight = getLatestSensorValue(weightDoc); // This will be { weight: 70, ... }
+        const latestWeight = getLatestSensorValue(weightDoc);
 
-        // --- ✅ FIX #2 ---
         setSensorData({
           heartRate: latestHeartRate?.value || null,
-          heartRateTimestamp: latestHeartRate?.timestamp || null, 
+          heartRateTimestamp: latestHeartRate?.timestamp || null,
           stepCount: latestStepCount?.value || null,
           stepCountTimestamp: latestStepCount?.timestamp || null,
-          weight: latestWeight?.weight || null, // <-- CHANGED from .value to .weight
+          weight: latestWeight?.weight || null,
+          height: latestWeight?.height || null,
         });
-
       } catch (err) {
         console.error('Error fetching data: ', err);
         setError('Failed to load student data.');
@@ -151,6 +163,54 @@ const StudentDetail = ({route}: StudentDetailProps) => {
     };
     fetchStudentData();
   }, [studentId]);
+
+  // --- ✅ NEW: Delete/Remove Student Function ---
+  const handleRemoveStudent = () => {
+    Alert.alert(
+      'Remove Student',
+      `Are you sure you want to remove ${student?.fullName} from your assigned students?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await firestore()
+                .collection('students')
+                .doc(studentId)
+                .update({
+                  counselorId: firestore.FieldValue.delete(),
+                });
+
+              Alert.alert(
+                'Success',
+                'Student has been removed from your assignments.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => navigation.goBack(),
+                  },
+                ],
+              );
+            } catch (err) {
+              console.error('Error removing student: ', err);
+              Alert.alert(
+                'Error',
+                'Failed to remove student. Please try again.',
+              );
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   // --- formatTimestamp helper (Unchanged) ---
   const formatTimestamp = (timestamp: any) => {
@@ -184,7 +244,7 @@ const StudentDetail = ({route}: StudentDetailProps) => {
   return (
     <View style={styles.fullContainer}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* --- Profile Header Card (Unchanged) --- */}
+        {/* --- Profile Header Card --- */}
         <View style={styles.profileHeader}>
           <Image
             style={styles.avatar}
@@ -200,7 +260,11 @@ const StudentDetail = ({route}: StudentDetailProps) => {
 
         {/* --- Heart Rate Card --- */}
         <Text style={styles.sectionTitle}>Live Sensor Data</Text>
-        <View style={styles.card}>
+
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('HeartRateGraph', {studentId})}
+          style={styles.card}>
           <Text style={styles.cardTitle}>Heart Rate</Text>
           <View style={styles.sensorCardContainer}>
             <HeartIcon />
@@ -209,22 +273,18 @@ const StudentDetail = ({route}: StudentDetailProps) => {
                 {sensorData?.heartRate || '--'}
                 <Text style={styles.sensorUnit}> BPM</Text>
               </Text>
-              {/* --- ✅ CHANGE 3a: Use heartRateTimestamp --- */}
               <Text style={styles.sensorTimestamp}>
                 Last update: {formatTimestamp(sensorData?.heartRateTimestamp)}
               </Text>
             </View>
           </View>
-        </View>
-
-        {/* --- Stress Level Card (Unchanged) --- */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Stress Level</Text>
-          <Text style={styles.valueText}>{sensorData?.weight || '--'}</Text>
-        </View>
+        </TouchableOpacity>
 
         {/* --- Activity Card --- */}
-        <View style={styles.card}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('StepsGraph', {studentId})}
+          style={styles.card}>
           <Text style={styles.cardTitle}>Activity</Text>
           <View style={styles.sensorCardContainer}>
             <StepIcon />
@@ -233,19 +293,59 @@ const StudentDetail = ({route}: StudentDetailProps) => {
                 {sensorData?.stepCount || '--'}
                 <Text style={styles.sensorUnit}> Steps</Text>
               </Text>
-              {/* --- ✅ CHANGE 3b: Use stepCountTimestamp --- */}
+              <Text style={styles.sensorTimestamp}>
+                Last update: {formatTimestamp(sensorData?.stepCountTimestamp)}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* --- BMI Card --- */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>BMI</Text>
+          <View style={styles.sensorCardContainer}>
+            <StepIcon />
+            <View style={styles.sensorTextContainer}>
+              <Text style={styles.sensorValue}>
+                <Text style={styles.sensorUnit}> Height : </Text>
+                {sensorData?.height || '-'}
+                <Text style={styles.sensorUnit}> CM</Text>
+              </Text>
+              <Text style={styles.sensorValue}>
+                <Text style={styles.sensorUnit}> Weight : </Text>
+                {sensorData?.weight || '-'}
+                <Text style={styles.sensorUnit}> Kg</Text>
+              </Text>
               <Text style={styles.sensorTimestamp}>
                 Last update: {formatTimestamp(sensorData?.stepCountTimestamp)}
               </Text>
             </View>
           </View>
         </View>
+
+        {/* --- ✅ Delete Button Under BMI Card --- */}
+        {student?.counselorId && (
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleRemoveStudent}
+            disabled={deleting}
+            activeOpacity={0.7}>
+            {deleting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <TrashIcon color="#FFFFFF" size={20} />
+                <Text style={styles.deleteButtonText}>Remove Student</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );
 };
 
-// --- Styles (Unchanged) ---
+// --- Styles ---
 const styles = StyleSheet.create({
   fullContainer: {flex: 1, backgroundColor: '#d3dbf5ff'},
   scrollContainer: {padding: 20, paddingBottom: 80},
@@ -295,6 +395,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#777',
     marginTop: 4,
+  },
+  // --- ✅ Delete Button Styles ---
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF6F61',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 20,
+    shadowColor: '#FF6F61',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 20,

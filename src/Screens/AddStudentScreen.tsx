@@ -1,3 +1,5 @@
+/* eslint-disable react/no-unstable-nested-components */
+/* eslint-disable react-native/no-inline-styles */
 import React, { useState } from 'react';
 import {
   View,
@@ -11,20 +13,40 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import auth from '@react-native-firebase/auth'; 
+import auth from '@react-native-firebase/auth';
 
-// --- UPDATED TYPE: Must include counselorId ---
+// --- UPDATED TYPE: Added counselorName ---
 type Student = {
   id: string;
   name: string;
   email: string;
-  counselorId: string | null; // <-- ADDED: Field to check assignment status
+  counselorId: string | null;
+  counselorName?: string; // NEW: Optional counselor name
 };
 
 const AddStudentScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // --- NEW: Helper function to fetch counselor name ---
+  const getCounselorName = async (counselorId: string): Promise<string> => {
+    try {
+      const counselorDoc = await firestore()
+        .collection('counselors')
+        .doc(counselorId)
+        .get();
+
+      if (counselorDoc.exists()) {
+        const data = counselorDoc.data();
+        return data?.fullName || data?.name || 'Unknown Counselor';
+      }
+      return 'Unknown Counselor';
+    } catch (error) {
+      console.error('Error fetching counselor:', error);
+      return 'Unknown Counselor';
+    }
+  };
 
   // --- Search Logic (Diagnostic Test Version - searches ALL students) ---
   const handleSearch = async () => {
@@ -33,29 +55,38 @@ const AddStudentScreen = () => {
       return;
     }
     setLoading(true);
-    setSearchResults([]); 
+    setSearchResults([]);
 
     try {
-      // ✅ Using the correct lowercase normalization
-      const normalizedQuery = searchQuery.toLowerCase(); 
+      const normalizedQuery = searchQuery.toLowerCase();
       const studentsRef = firestore().collection('students');
-      
+
       const q = await studentsRef
         .where('fullName', '>=', normalizedQuery)
         .where('fullName', '<=', normalizedQuery + '\uf8ff')
-        // NOTE: The 'counselorId == null' filter is REMOVED here to allow viewing all students.
         .get();
 
       const students: Student[] = [];
-      q.forEach((doc) => {
+
+      // Fetch all students first
+      for (const doc of q.docs) {
         const data = doc.data();
-        students.push({ 
+        const counselorId = data.counselorId || null;
+
+        // Fetch counselor name if counselorId exists
+        let counselorName;
+        if (counselorId) {
+          counselorName = await getCounselorName(counselorId);
+        }
+
+        students.push({
           id: doc.id,
           name: data.fullName || 'No Name',
           email: data.email || 'No Email',
-          counselorId: data.counselorId || null, // <-- FETCHING THE ID IS CRUCIAL
+          counselorId: counselorId,
+          counselorName: counselorName, // NEW: Include counselor name
         });
-      });
+      }
 
       setSearchResults(students);
       if (students.length === 0) {
@@ -80,16 +111,21 @@ const AddStudentScreen = () => {
 
     try {
       const studentRef = firestore().collection('students').doc(studentId);
-      
+
       await studentRef.update({
         counselorId: currentCounselorId,
       });
 
+      // Fetch the current counselor's name
+      const currentCounselorName = await getCounselorName(currentCounselorId);
+
       // Update the UI immediately without re-searching
-      setSearchResults(prevResults => prevResults.map(student => 
-        student.id === studentId ? { ...student, counselorId: currentCounselorId } : student
+      setSearchResults(prevResults => prevResults.map(student =>
+        student.id === studentId
+          ? { ...student, counselorId: currentCounselorId, counselorName: currentCounselorName }
+          : student
       ));
-      
+
       Alert.alert('Success', 'Student added to your list.');
 
     } catch (error) {
@@ -100,26 +136,31 @@ const AddStudentScreen = () => {
 
   // --- Conditional Rendering Function ---
   const renderStudent = ({ item }: { item: Student }) => {
-    const isAssigned = item.counselorId && item.counselorId !== ''; // Check for non-null/non-empty string
+    const isAssigned = item.counselorId && item.counselorId !== '';
 
     return (
       <View style={styles.card}>
         <View style={styles.studentInfo}>
           <Text style={styles.studentName}>{item.name}</Text>
-          <Text style={styles.studentEmail}>{item.email}</Text>
+
+
+          {/* NEW: Display counselor name if available */}
+          {item.counselorName && (
+            <Text style={styles.counselorName}>
+              Assigned under {item.counselorName}
+            </Text>
+          )}
         </View>
-        
+
         {isAssigned ? (
-          // Display status if already assigned
           <View style={styles.assignedTag}>
             <Text style={styles.assignedTagText}>Assigned</Text>
           </View>
         ) : (
-          // Display Add button if unassigned
-          <Button 
-            title="Add" 
-            onPress={() => handleAddStudent(item.id)} 
-            color="#489448ff" // Green color for Add
+          <Button
+            title="Add"
+            onPress={() => handleAddStudent(item.id)}
+            color="#489448ff"
           />
         )}
       </View>
@@ -130,7 +171,7 @@ const AddStudentScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Add Student</Text>
       <Text style={styles.subtitle}>Search for any student by name.</Text>
-      
+
       <TextInput
         style={styles.searchInput}
         placeholder="Search by student name..."
@@ -139,9 +180,9 @@ const AddStudentScreen = () => {
         onChangeText={setSearchQuery}
         autoCapitalize="none"
       />
-      
-      <TouchableOpacity 
-        style={styles.searchButton} 
+
+      <TouchableOpacity
+        style={styles.searchButton}
         onPress={handleSearch}
         disabled={loading}
       >
@@ -246,15 +287,21 @@ const styles = StyleSheet.create({
     color: '#777',
     marginTop: 2,
   },
-  // --- NEW STATUS TAG STYLES ---
+  // NEW: Style for counselor name
+  counselorName: {
+    fontSize: 12,
+    color: '#6f5be1ff',
+    marginTop: 4,
+
+  },
   assignedTag: {
-    backgroundColor: '#f8e3e3ff', // Light Red/Gray for Assigned
+    backgroundColor: '#f8e3e3ff',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   assignedTagText: {
-    color: '#f15252ff', // Red text
+    color: '#f15252ff',
     fontWeight: 'bold',
     fontSize: 13,
   },

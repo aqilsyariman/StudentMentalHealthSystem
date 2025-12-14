@@ -1,87 +1,27 @@
-// import AppleHealthKit, { HealthInputOptions, HealthValue } from 'react-native-health';
-// import auth from '@react-native-firebase/auth';
-
-// export const getHeartRate = (
-//   callback: (data: { value: number | null; date: string | null }) => void
-// ) => {
-//   const options: HealthInputOptions = {
-//     startDate: new Date(2024, 0, 1).toISOString(),
-//     endDate: new Date().toISOString(),
-//     limit: 1,
-//     ascending: false,
-//   };
-
-//   AppleHealthKit.getHeartRateSamples(options, (err, results: HealthValue[]) => {
-//     if (err || !results || results.length === 0) {
-//       console.error('Error fetching heart rate:', err);
-//       callback({ value: null, date: null });
-//       console.log('User UID:', auth().currentUser?.uid);
-//       return;
-//     }
-
-//     const latest = results[0];
-//     callback({ value: latest.value, date: latest.startDate });
-//   });
-// };
-
-// import AppleHealthKit, { HealthValue } from 'react-native-health';
-// import auth from '@react-native-firebase/auth';
-// import firestore from '@react-native-firebase/firestore';
-
-// const SAVE_TO_FIRESTORE = false;
-// export const getHeartRate = async (
-//   callback: (data: { value: number | null; date: string | null }) => void
-// ) => {
-//   const user = auth().currentUser;
-
-//   if (!user) {
-//     console.warn('User not authenticated. Please log in first.');
-//     callback({ value: null, date: null });
-//     return;
-//   }
-
-//   console.log('Fetching heart rate for UID:', user.uid);
-
-//   const options = {
-//     startDate: new Date(2024, 0, 1).toISOString(),
-//     endDate: new Date().toISOString(),
-//     limit: 1,
-//     ascending: false,
-//   };
-
-//   AppleHealthKit.getHeartRateSamples(options, async (err, results: HealthValue[]) => {
-//     if (err  || !results || results.length === 0) {
-//       console.error('Error fetching heart rate:', err);
-//       callback({ value: null, date: null });
-//       return;
-//     }
-
-//     const latest = results[0];
-//     const heartRateData = { value: latest.value, date: latest.startDate };
-
-//     // ✅ Save into Firestore
-//     console.log('Writing to Firestore path:', `students/${user.uid}/sensorData`);
-
-// try {
-//   if(SAVE_TO_FIRESTORE){
-//   await firestore()
-//     .collection('students')
-//     .doc(user.uid)
-//     .collection('sensorData')
-//     .add(heartRateData);
-//   }
-//   console.log('✅ Saved:', heartRateData);
-// } catch (saveErr: any) {
-//   console.error('❌ Firestore save failed:', saveErr);
-// }
-
-//     callback(heartRateData);
-//   });
-// };
-
+/* eslint-disable no-trailing-spaces */
 import AppleHealthKit, { HealthValue } from 'react-native-health';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
+
+// --- HEART RATE SCORING CONSTANTS ---
+const RHR_POOR = 85; // 0% Score at 85 BPM
+const RHR_IDEAL = 50; // 100% Score at 55 BPM
+const RHR_RANGE = RHR_POOR - RHR_IDEAL; // 30 BPM range
+
+const calculateHeartRateScore = (rhr: number): number => {
+  if (rhr <= RHR_IDEAL) {
+    return 100; // Optimal or better
+  }
+  if (rhr >= RHR_POOR) {
+    return 0; // Poor or worse
+  }
+
+
+  const score = 100 * (RHR_POOR - rhr) / RHR_RANGE;
+
+  return Math.round(score);
+};
+// ------------------------------------
 
 const SAVE_TO_FIRESTORE = true;
 
@@ -92,7 +32,7 @@ const getLocalDateString = (date: Date) => {
 };
 
 export const getHeartRate = async (
-  callback: (data: { value: number | null; date: string | null }) => void,
+  callback: (data: { value: number | null; date: string | null; score?: number | null }) => void,
 ) => {
   const user = auth().currentUser;
 
@@ -120,10 +60,16 @@ export const getHeartRate = async (
 
       const latestReading = results[0];
       const readingDate = new Date(latestReading.startDate);
+      const rawRHR = latestReading.value;
+
+      // === NEW CALCULATION ===
+      const heartRateScore = calculateHeartRateScore(rawRHR);
+      // =======================
 
       // 1. This is the new data object to save
       const newReadingData = {
-        value: latestReading.value,
+        value: rawRHR,
+        score: heartRateScore, // <-- Includes the new calculated score
         timestamp: firestore.Timestamp.fromDate(readingDate), // Use a real timestamp
       };
 
@@ -133,33 +79,34 @@ export const getHeartRate = async (
       // --- ✅ Save to Firestore ---
       if (SAVE_TO_FIRESTORE) {
         try {
-          // 1. Get a reference to the SINGLE document
           const sensorDocRef = firestore()
             .collection('students')
             .doc(user.uid)
             .collection('sensorData')
-            .doc('heartRate'); // <-- This points to your 'heartRate' doc
+            .doc('heartRate');
 
-          // 2. Use .set() with dot notation and merge
-          // This tells Firestore: "In the 'data' map, find the key [dateKey]
-          // and add this new object to its array."
+          // This saves the raw value and the calculated score.
           await sensorDocRef.set({
               data: {
                 [dateKey]: firestore.FieldValue.arrayUnion(newReadingData),
-
               },
             },
             { merge: true } // ✨ This is ESSENTIAL!
           );
 
-          console.log(`✅ Saved new reading to map key: ${dateKey}`);
+          console.log(`✅ Saved new HR reading (Score: ${heartRateScore}) to map key: ${dateKey}`);
         } catch (saveErr: any) {
           console.error('❌ Firestore save failed:', saveErr.message);
         }
       }
       // --- End of Firestore Save ---
 
-      callback({ value: latestReading.value, date: latestReading.startDate });
+      // Return the raw value, date, AND the new score via the callback
+      callback({
+        value: rawRHR, 
+        date: latestReading.startDate, 
+        score: heartRateScore,
+      });
     },
   );
 };

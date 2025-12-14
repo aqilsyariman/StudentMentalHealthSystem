@@ -1,9 +1,27 @@
+/* eslint-disable curly */
+/* eslint-disable no-trailing-spaces */
 import AppleHealthKit, {
-  HealthValue, // Use the HealthValue type
+  HealthValue,
   HealthInputOptions,
 } from 'react-native-health';
-import auth from '@react-native-firebase/auth'; // ✅ 1. Add auth import
-import firestore from '@react-native-firebase/firestore'; // ✅ 2. Add firestore import
+import auth from '@react-native-firebase/auth'; 
+import firestore from '@react-native-firebase/firestore';
+
+// --- STEP COUNT SCORING CONSTANTS ---
+
+const calculateStepCountScore = (steps: number): number => {
+  if (steps === null || steps === undefined || steps < 0) return 0;
+  
+  // Scoring thresholds based on common wellness targets (Higher is Better)
+  if (steps >= 10000) return 100; // Optimal (10,000+ steps)
+  if (steps >= 8000) return 85;  // Excellent (8,000 - 9,999)
+  if (steps >= 6000) return 65;  // Good (6,000 - 7,999)
+  if (steps >= 4000) return 40;  // Average (4,000 - 5,999)
+  if (steps >= 2000) return 20;  // Below Average (2,000 - 3,999)
+  
+  return 5; // Poor (below 2,000 steps - minimal positive contribution)
+};
+// ------------------------------------
 
 const SAVE_TO_FIRESTORE = true;
 
@@ -13,7 +31,7 @@ const getLocalDateString = (date: Date) => {
 };
 
 export const getDailyStepCount = (
-  callback: (data: { value: number | null; date: string | null }) => void,
+  callback: (data: { value: number | null; date: string | null, score?: number | null }) => void,
 ) => {
   // ✅ 3. Add user auth check
   const user = auth().currentUser;
@@ -43,25 +61,30 @@ export const getDailyStepCount = (
       // 5. Get latest reading (index 0 is latest due to ascending: false)
       const latestReading = results[0];
       const readingDate = new Date(latestReading.startDate);
+      const rawSteps = latestReading.value;
+      
+      // === NEW CALCULATION ===
+      const stepCountScore = calculateStepCountScore(rawSteps);
+      // =======================
+
 
       const newReadingData = {
-        value: latestReading.value,
+        value: rawSteps,
+        score: stepCountScore,
         timestamp: firestore.Timestamp.fromDate(readingDate),
       };
 
       const dateKey = getLocalDateString(readingDate);
 
-      // --- ✅ 6. Save to Firestore (Copied from getHeartRate) ---
+      // --- ✅ 6. Save to Firestore ---
       if (SAVE_TO_FIRESTORE) {
         try {
-          // Get reference, but change 'heartRate' to 'stepCount'
           const sensorDocRef = firestore()
             .collection('students')
             .doc(user.uid)
             .collection('sensorData')
-            .doc('stepCount'); // <-- The main change is here
+            .doc('stepCount');
 
-          // Set logic is identical to your heart rate function
           await sensorDocRef.set(
             {
               data: {
@@ -71,7 +94,7 @@ export const getDailyStepCount = (
             { merge: true }, // This is essential
           );
 
-          console.log(`✅ Saved new step reading to map key: ${dateKey}`);
+          console.log(`✅ Saved new step reading (Score: ${stepCountScore}) to map key: ${dateKey}`);
         } catch (saveErr: any) {
           console.error('❌ Firestore save failed (steps):', saveErr.message);
         }
@@ -79,7 +102,11 @@ export const getDailyStepCount = (
       // --- End of Firestore Save ---
 
       // 7. Final callback
-      callback({ value: latestReading.value, date: latestReading.startDate });
+      callback({ 
+          value: rawSteps, 
+          date: latestReading.startDate,
+          score: stepCountScore, // Return the score
+      });
     },
   );
 };

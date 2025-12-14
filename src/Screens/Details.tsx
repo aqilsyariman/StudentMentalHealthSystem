@@ -9,7 +9,7 @@ const DetailsScreen = () => {
   return (
     <View style={styles.fullContainer}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Text style={styles.welcomeUser}>Hello, Doctor!</Text>
+          <Text style={styles.welcomeUser}>Hello!</Text>
       </ScrollView>
     </View>
   );

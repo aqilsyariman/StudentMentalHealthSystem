@@ -6,7 +6,7 @@ import {
   Text,
   View,
   TextInput,
-  Dimensions, // This is already imported, which is great
+  Dimensions,
   Pressable,
   KeyboardAvoidingView,
   ScrollView,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     // ✅ -- FIX 2: Use the responsive value --
     // On small screens, use a smaller offset (-40)
     // On tall screens, use your original offset (-60)
-    top: IS_SMALL_SCREEN ? -25 : -20,
+    top: IS_SMALL_SCREEN ? -25 : -25,
   },
 });
 

@@ -14,6 +14,8 @@ import DetailsScreen from './Screens/Details';
 import ListStudent from './Screens/ListStudent';
 import StudentDetail from './Screens/StudentDetail';
 import AddStudentScreen from './Screens/AddStudentScreen';
+import HeartRateGraph from './Screens/GraphScreen/HeartRateGraph';
+import StepsGraph from './Screens/GraphScreen/StepsGraph';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -43,7 +45,7 @@ const App = () => {
               .collection('counselors')
               .doc(user.uid)
               .get();
-            
+
             // --- (THIS IS THE FIX) ---
             // Don't just check if the doc exists.
             // Check the 'role' field INSIDE the document.
@@ -52,11 +54,11 @@ const App = () => {
             } else if (counselorDoc.exists()) {
               // User is in the counselor collection but NOT an active counselor
               // (e.g., role: 'pending'), so they have no role for now.
-              userRole = null; 
+              userRole = null;
             }
             // --- (END OF FIX) ---
           }
-          
+
           setRole(userRole);
         } catch (error) {
           console.error('App.tsx: Error checking user role: ', error);
@@ -94,7 +96,7 @@ const App = () => {
                 props,
               ) => (
                 <RoleSelection
-                  {...props} 
+                  {...props}
                   onRoleSelected={newRole => {
                     setRole(newRole);
                     setIsRoleLoading(false);
@@ -138,6 +140,17 @@ const App = () => {
               name="AddStudentScreen"
               component={AddStudentScreen}
             />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Heart Rate Graph'}}
+              name="HeartRateGraph"
+              component={HeartRateGraph}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Steps Count Graph'}}
+              name="StepsGraph"
+              component={StepsGraph}
+            />
+
           </Stack.Group>
         )}
       </Stack.Navigator>

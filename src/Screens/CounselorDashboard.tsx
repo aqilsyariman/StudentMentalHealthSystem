@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Svg, {Path, G, Rect} from 'react-native-svg';
-import auth from '@react-native-firebase/auth'; // <-- Needed for user ID
+import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import { RootStackParamList } from '../types/navigation';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-// --- Icon Component (Added) ---
-// This is the "warning" icon you provided
+
+// --- Icon Component ---
 const WarningIcon = ({color = '#FF6F61'}) => (
   // eslint-disable-next-line react-native/no-inline-styles
   <View style={{width: 24, height: 24}}>
@@ -31,7 +31,7 @@ const WarningIcon = ({color = '#FF6F61'}) => (
   </View>
 );
 
-// --- Mock Data (Added) ---
+// --- Mock Data ---
 const recentAlerts = [
   {
     id: '1',
@@ -71,47 +71,107 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CounselorDashboard'>;
 
 const CounselorDashboard = ({ navigation }: Props) => {
   const [activeStudents, setActiveStudents] = useState<number | null>(null);
+  const [counselorName, setCounselorName] = useState<string>('Loading...');
 
-  useFocusEffect(() => {
-    const fetchStudentCount = async () => {
-      // 1. Get the current user's ID
-      const currentCounselorId = auth().currentUser?.uid;
 
-      if (!currentCounselorId) {
-        setActiveStudents(0);
+  // --- Data Fetching Functions ---
+
+  const fetchStudentCount = async (currentCounselorId: string) => {
+    try {
+      const snapshot = await firestore()
+        .collection('students')
+        .where('counselorId', '==', currentCounselorId)
+        .get();
+
+      setActiveStudents(snapshot.size);
+    } catch (error) {
+      console.error('Error fetching student count: ', error);
+      setActiveStudents(0);
+    }
+  };
+
+  // 🚀 FINAL CORRECTED FUNCTION SIGNATURE AND LOGIC
+  // This function uses setCounselorName from the component's scope
+  const fetchCounselorName = async (currentCounselorId: string) => {
+    if (!currentCounselorId) {
+      setCounselorName('Guest');
+      return;
+    }
+
+    try {
+      // 🚀 CORRECTED LOGIC: Fetch the document directly using the UID as the Document ID
+      const counselorDocument = await firestore()
+        .collection('counselors')
+        .doc(currentCounselorId) // <-- Use .doc() instead of .where()
+        .get();
+
+      console.log('Fetching counselor name for UID:', currentCounselorId);
+
+      if (!counselorDocument.exists) { // <-- Check if the document exists
+        console.log('Error: No counselor document found for UID:', currentCounselorId);
+        setCounselorName('Unknown Counselor');
         return;
       }
 
-      try {
-        // 2. Query Firestore and filter by the counselorId field
-        const snapshot = await firestore()
-          .collection('students')
-          .where('counselorId', '==', currentCounselorId) // <-- KEY FILTER
-          .get();
-          
-        setActiveStudents(snapshot.size);
-      } catch (error) {
-        console.error('Error fetching student count: ', error);
-        setActiveStudents(0);
+      // Access the data
+      const data = counselorDocument.data();
+
+      // Make sure 'data' is not undefined before accessing 'fullName'
+      if (data && data.fullName) {
+          // Extract the 'fullName' field.
+          const name = data.fullName;
+
+          // Update the state.
+          setCounselorName(name);
+      } else {
+          console.error('Error: Document exists but is missing fullName field.');
+          setCounselorName('Name Missing');
       }
-    };
 
-    fetchStudentCount();
-  }, ); // Depend on auth state implicitly
+    } catch (error) {
+      console.error('Error fetching counselor name: ', error);
+      setCounselorName('Error Loading Name');
+    }
+  };
+  // --- useFocusEffect to manage data loading ---
+  useFocusEffect(
+    useCallback(() => {
+      const currentUserId = auth().currentUser?.uid;
+      // You can keep this log for development, but remove it for production
+      console.log('Logged-in User ID:', currentUserId);
 
+      if (currentUserId) {
+        // Run both data fetching functions when the screen is focused
+        fetchStudentCount(currentUserId);
+        // Call the corrected function
+        fetchCounselorName(currentUserId);
+      } else {
+        setActiveStudents(0);
+        setCounselorName('Guest');
+      }
+
+      return () => {
+        // Optional cleanup
+      };
+    }, [])
+  );
+
+
+  // --- Render Block ---
   return (
     <View style={styles.fullContainer}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View>
-          <Text style={styles.welcomeUser}>Hello, Doctor!</Text>
+          {/* Displaying the fetched name */}
+          <Text style={styles.welcomeUser}>Hello {counselorName}!</Text>
         </View>
         <Text style={styles.appTitle}>Student Support Hub</Text>
         <View>
-          {/* --- Active Student Card (MODIFIED: Now shows assigned count) --- */}
+
           <Card onPress={() => navigation.navigate('ListStudent')}>
             <View style={styles.cardContainerColumn}>
               <Svg width={80} height={80} viewBox="0 0 200 200">
-                {/* Circle background (Keep this, it's fine) */}
+
                 <G fill="#4b84abff" scale="0.4" x={20} y={30}>
                   <Path
                     d="M363.663,294.916c0-18.823-13.48-34.545-31.289-38.05v-25.655c0-2.333-1.086-4.534-2.938-5.953
@@ -273,13 +333,12 @@ const CounselorDashboard = ({ navigation }: Props) => {
           {/* --- Quick Actions Card (Existing) --- */}
           <Card title="Quick Actions">
             <View style={styles.gridContainer}>
-              
+
               {/* --- Box 1 (MODIFIED for Add Student) --- */}
-              <TouchableOpacity 
-                style={styles.boxWrapper} 
+              <TouchableOpacity
+                style={styles.boxWrapper}
                 activeOpacity={0.7}
-                // --- THIS IS THE NAVIGATION YOU ASKED FOR ---
-                onPress={() => navigation.navigate('AddStudentScreen')} 
+                onPress={() => navigation.navigate('AddStudentScreen')}
               >
                 <View style={[styles.box, styles.box1]}>
                   {/* ... (plus icon) ... */}
@@ -296,7 +355,7 @@ const CounselorDashboard = ({ navigation }: Props) => {
                     </G>
                   </Svg>
                   {/* --- TEXT CHANGED --- */}
-                  <Text style={styles.box1}>Add Student</Text> 
+                  <Text style={styles.box1}>Add Student</Text>
                 </View>
               </TouchableOpacity>
 
@@ -477,23 +536,22 @@ const CounselorDashboard = ({ navigation }: Props) => {
   );
 };
 
-// --- THIS IS THE UPDATED CARD COMPONENT ---
-// --- THIS IS THE UPDATED CARD COMPONENT ---
+// --- Helper Components (Card and ValueText) ---
 const Card = ({
   title,
   children,
-  onPress, // <-- 1. Make sure you receive the onPress prop
+  onPress,
 }: {
   title?: string;
   children?: React.ReactNode;
   onPress?: () => void;
 }) => (
-  // 2. Change <View> to <TouchableOpacity>
+
   <TouchableOpacity
     style={styles.card}
-    onPress={onPress} // 3. Pass the onPress prop here
-    disabled={!onPress} // 4. (Good practice) Disable touch if no onPress is provided
-    activeOpacity={onPress ? 0.7 : 1.0} // (Good practice) Only show feedback if pressable
+    onPress={onPress}
+    disabled={!onPress}
+    activeOpacity={onPress ? 0.7 : 1.0}
   >
     {title && <Text style={styles.cardTitle}>{title}</Text>}
     {children}
@@ -513,6 +571,7 @@ const ValueText = ({
   </Text>
 );
 
+// --- Stylesheet ---
 const styles = StyleSheet.create({
   fullContainer: {flex: 1, backgroundColor: '#d3dbf5ff'},
   scrollContainer: {padding: 20, paddingBottom: 80},
@@ -645,18 +704,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // --- NEW STYLES ADDED BELOW ---
+  // --- NEW STYLES BELOW ---
 
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-    // Space between header and first item
   },
   cardHeaderTitle: {
     fontSize: 18,
-    fontWeight: 'bold', // Using 'bold' to match screenshot
+    fontWeight: 'bold',
     color: '#333',
   },
   showAllText: {
@@ -703,13 +761,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 10,
-    paddingVertical: 12, // Added padding to the item
-    paddingHorizontal: 10, // Added padding to the item
+    paddingVertical: 12,
+    paddingHorizontal: 10,
   },
   scheduleBar: {
     width: 6,
-    borderRadius: 3, // Rounded bar
-    marginRight: 10, // Space between bar and text
+    borderRadius: 3,
+    marginRight: 10,
   },
   scheduleTime: {
     fontSize: 12,
