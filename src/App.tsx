@@ -16,6 +16,7 @@ import StudentDetail from './Screens/StudentDetail';
 import AddStudentScreen from './Screens/AddStudentScreen';
 import HeartRateGraph from './Screens/GraphScreen/HeartRateGraph';
 import StepsGraph from './Screens/GraphScreen/StepsGraph';
+import ManualSleepTracker from './Screens/ManualSleepTracker';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -49,7 +50,10 @@ const App = () => {
             // --- (THIS IS THE FIX) ---
             // Don't just check if the doc exists.
             // Check the 'role' field INSIDE the document.
-            if (counselorDoc.exists() && counselorDoc.data()?.role === 'counselor') {
+            if (
+              counselorDoc.exists() &&
+              counselorDoc.data()?.role === 'counselor'
+            ) {
               userRole = 'counselor';
             } else if (counselorDoc.exists()) {
               // User is in the counselor collection but NOT an active counselor
@@ -92,9 +96,7 @@ const App = () => {
           // --- 2. NEW USER (No Role) ---
           <Stack.Group>
             <Stack.Screen name="RoleSelection">
-              {(
-                props,
-              ) => (
+              {props => (
                 <RoleSelection
                   {...props}
                   onRoleSelected={newRole => {
@@ -116,6 +118,22 @@ const App = () => {
               options={{headerShown: true}}
               name="Details"
               component={DetailsScreen}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Heart Rate Graph'}}
+              name="HeartRateGraph"
+              component={HeartRateGraph}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Steps Count Graph'}}
+              name="StepsGraph"
+              component={StepsGraph}
+            />
+            <Stack.Screen
+            options={{headerShown: true, title: 'Sleep Tracker'}}
+              name="ManualSleepTracker"
+              component={ManualSleepTracker}
+           
             />
           </Stack.Group>
         ) : (
@@ -150,7 +168,6 @@ const App = () => {
               name="StepsGraph"
               component={StepsGraph}
             />
-
           </Stack.Group>
         )}
       </Stack.Navigator>

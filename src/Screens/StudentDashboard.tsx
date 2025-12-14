@@ -94,8 +94,24 @@ const DashboardScreen = ({navigation}: Props) => {
     );
   };
 
+  // ✅ Navigate to heart rate detail view
+  const handleHeartRatePress = () => {
+    const currentUserId = auth().currentUser?.uid;
+    if (currentUserId) {
+      navigation.navigate('HeartRateGraph', {studentId: currentUserId});
+    }
+  };
+
+  // ✅ Navigate to steps detail view
+  const handleStepsPress = () => {
+    const currentUserId = auth().currentUser?.uid;
+    if (currentUserId) {
+      navigation.navigate('StepsGraph', {studentId: currentUserId});
+    }
+  };
+
   useEffect(() => {
-    if (!isIOS) {return;}
+    if (!isIOS) return;
 
     AppleHealthKit.initHealthKit(permissions, err => {
       if (err) {
@@ -138,12 +154,16 @@ const DashboardScreen = ({navigation}: Props) => {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
+    const dateLocal = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const yesterdayLocal = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+    if (dateLocal.getTime() === todayLocal.getTime()) {
       return `Today, ${date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
       })}`;
-    } else if (date.toDateString() === yesterday.toDateString()) {
+    } else if (dateLocal.getTime() === yesterdayLocal.getTime()) {
       return `Yesterday, ${date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
@@ -172,6 +192,7 @@ const DashboardScreen = ({navigation}: Props) => {
         </View>
 
         {/* Full Width Stats Cards */}
+        {/* ✅ UPDATED: Pass onPress to QuickStatCard for Steps */}
         <QuickStatCard
           title="Steps"
           value={
@@ -182,7 +203,12 @@ const DashboardScreen = ({navigation}: Props) => {
           icon="👟"
           color="#8B5CF6"
           score={stepCountScore}
+          date={steps?.date}
+          formatDate={formatDate}
+          onPress={handleStepsPress}
         />
+        
+        {/* ✅ UPDATED: Pass onPress to QuickStatCard for Heart Rate */}
         <QuickStatCard
           title="Heart Rate"
           value={heartRate?.value ? `${heartRate.value}` : '---'}
@@ -196,6 +222,9 @@ const DashboardScreen = ({navigation}: Props) => {
           }
           color="#EF4444"
           score={heartRateScore}
+          date={heartRate?.date}
+          formatDate={formatDate}
+          onPress={handleHeartRatePress}
         />
 
         {/* Main Health Cards */}
@@ -221,7 +250,7 @@ const DashboardScreen = ({navigation}: Props) => {
           )}
         </DetailCard>
 
-        <DetailCard title="Sleep Analysis" icon="😴" color="#6366F1">
+        {/* <DetailCard title="Sleep Analysis" icon="😴" color="#6366F1">
           {sleep?.summary ? (
             <View style={styles.sleepGrid}>
               <SleepStat label="In Bed" value={sleep.summary.inBed} />
@@ -237,7 +266,46 @@ const DashboardScreen = ({navigation}: Props) => {
           {sleep?.date && (
             <Text style={styles.timestamp}>{formatDate(sleep.date)}</Text>
           )}
-        </DetailCard>
+        </DetailCard> */}
+
+<TouchableOpacity
+  style={styles.detailCard}
+  onPress={() => navigation.navigate('ManualSleepTracker')}
+  activeOpacity={0.7}>
+  <View style={styles.cardHeader}>
+    <View style={styles.cardHeaderLeft}>
+      <View style={[styles.cardIconBadge, {backgroundColor: '#6366F1' + '15'}]}>
+        <Text style={styles.cardIcon}>😴</Text>
+      </View>
+      <Text style={styles.cardTitle}>Sleep Analysis</Text>
+    </View>
+    <Text style={styles.tapToLogText}>Tap to Log</Text>
+  </View>
+  <View style={styles.cardContent}>
+    {sleep?.summary ? (
+      <View>
+        <View style={styles.sleepSummary}>
+          <Text style={styles.sleepDurationLabel}>Last Sleep Duration</Text>
+          <Text style={styles.sleepDurationValue}>
+            {sleep.summary.duration} hours
+          </Text>
+        </View>
+        <View style={styles.sleepTimes}>
+          <View style={styles.sleepTimeItem}>
+            <Text style={styles.sleepTimeLabel}>🌙 Bed Time</Text>
+            <Text style={styles.sleepTimeValue}>{sleep.summary.bedTime}</Text>
+          </View>
+          <View style={styles.sleepTimeItem}>
+            <Text style={styles.sleepTimeLabel}>☀️ Wake Time</Text>
+            <Text style={styles.sleepTimeValue}>{sleep.summary.wakeTime}</Text>
+          </View>
+        </View>
+      </View>
+    ) : (
+      <Text style={styles.noData}>No sleep data logged yet. Tap to start tracking!</Text>
+    )}
+  </View>
+</TouchableOpacity>
 
         <DetailCard title="Body Metrics" icon="📊" color="#10B981">
           <View style={styles.metricsGrid}>
@@ -284,6 +352,7 @@ const DashboardScreen = ({navigation}: Props) => {
   );
 };
 
+// ✅ UPDATED: Add onPress prop to QuickStatCard
 const QuickStatCard = ({
   title,
   value,
@@ -291,6 +360,9 @@ const QuickStatCard = ({
   icon,
   color,
   score,
+  date,
+  formatDate,
+  onPress,
 }: {
   title: string;
   value: string;
@@ -298,16 +370,20 @@ const QuickStatCard = ({
   icon?: React.ReactNode;
   color: string;
   score?: number | null;
+  date?: string | null;
+  formatDate?: (dateString: string) => string;
+  onPress?: () => void; // ✅ Add this
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
-    if (s === null || s === undefined) {return '#9CA3AF';}
-    if (s >= 80) {return '#10B981';}
-    if (s >= 60) {return '#F59E0B';}
-    if (s >= 40) {return '#F97316';}
+    if (s === null || s === undefined) return '#9CA3AF';
+    if (s >= 80) return '#10B981';
+    if (s >= 60) return '#F59E0B';
+    if (s >= 40) return '#F97316';
     return '#EF4444';
   };
 
-  return (
+  // ✅ Wrap the entire card in TouchableOpacity if onPress is provided
+  const CardContent = (
     <View style={styles.quickStatCard}>
       {score !== null && score !== undefined && (
         <View
@@ -335,8 +411,23 @@ const QuickStatCard = ({
           </View>
         </View>
       </View>
+      {date && formatDate && (
+        <Text style={styles.timestamp}>{formatDate(date)}</Text>
+      )}
     </View>
   );
+
+  // ✅ If onPress exists, wrap in TouchableOpacity
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {CardContent}
+      </TouchableOpacity>
+    );
+  }
+
+  // ✅ Otherwise, return just the card
+  return CardContent;
 };
 
 const DetailCard = ({
@@ -353,18 +444,18 @@ const DetailCard = ({
   score?: number | null;
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
-    if (s === null || s === undefined) {return '#9CA3AF';}
-    if (s >= 80) {return '#10B981';}
-    if (s >= 60) {return '#F59E0B';}
-    if (s >= 40) {return '#F97316';}
+    if (s === null || s === undefined) return '#9CA3AF';
+    if (s >= 80) return '#10B981';
+    if (s >= 60) return '#F59E0B';
+    if (s >= 40) return '#F97316';
     return '#EF4444';
   };
 
   const getScoreLabel = (s: number | null | undefined) => {
-    if (s === null || s === undefined) {return 'No Data';}
-    if (s >= 80) {return 'Optimal';}
-    if (s >= 60) {return 'Good';}
-    if (s >= 40) {return 'Fair';}
+    if (s === null || s === undefined) return 'No Data';
+    if (s >= 80) return 'Optimal';
+    if (s >= 60) return 'Good';
+    if (s >= 40) return 'Fair';
     return 'Needs Attention';
   };
 
@@ -394,20 +485,20 @@ const DetailCard = ({
   );
 };
 
-const SleepStat = ({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) => (
-  <View style={[styles.sleepStat, highlight && styles.sleepStatHighlight]}>
-    <Text style={styles.sleepStatValue}>{value}</Text>
-    <Text style={styles.sleepStatLabel}>{label}</Text>
-  </View>
-);
+// const SleepStat = ({
+//   label,
+//   value,
+//   highlight,
+// }: {
+//   label: string;
+//   value: string;
+//   highlight?: boolean;
+// }) => (
+//   <View style={[styles.sleepStat, highlight && styles.sleepStatHighlight]}>
+//     <Text style={styles.sleepStatValue}>{value}</Text>
+//     <Text style={styles.sleepStatLabel}>{label}</Text>
+//   </View>
+// );
 
 const MetricItem = ({
   label,
@@ -758,6 +849,51 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  tapToLogText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#6366F1',
+  textTransform: 'uppercase',
+},
+sleepSummary: {
+  alignItems: 'center',
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F3F4F6',
+  marginBottom: 16,
+},
+sleepDurationLabel: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#6B7280',
+  marginBottom: 8,
+},
+sleepDurationValue: {
+  fontSize: 36,
+  fontWeight: '800',
+  color: '#6366F1',
+},
+sleepTimes: {
+  flexDirection: 'row',
+  gap: 16,
+},
+sleepTimeItem: {
+  flex: 1,
+  backgroundColor: '#F9FAFB',
+  padding: 16,
+  borderRadius: 12,
+},
+sleepTimeLabel: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#6B7280',
+  marginBottom: 6,
+},
+sleepTimeValue: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#1F2937',
+},
 });
 
 export default DashboardScreen;

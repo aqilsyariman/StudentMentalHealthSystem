@@ -9,4 +9,5 @@ export type RootStackParamList = {
   AddStudentScreen: undefined;
   HeartRateGraph: {studentId: string};
   StepsGraph: {studentId: string};
+  ManualSleepTracker: undefined;
 };
