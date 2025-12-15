@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import AppleHealthKit, {HealthKitPermissions} from 'react-native-health';
 import auth from '@react-native-firebase/auth';
@@ -70,6 +71,7 @@ const DashboardScreen = ({navigation}: Props) => {
     date: string | null;
   } | null>(null);
   const [bp, setBP] = useState<BloodPressureData | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const heartRateScore = heartRate?.score;
   const stepCountScore = steps?.score;
@@ -94,7 +96,6 @@ const DashboardScreen = ({navigation}: Props) => {
     );
   };
 
-  // ✅ Navigate to heart rate detail view
   const handleHeartRatePress = () => {
     const currentUserId = auth().currentUser?.uid;
     if (currentUserId) {
@@ -102,13 +103,64 @@ const DashboardScreen = ({navigation}: Props) => {
     }
   };
 
-  // ✅ Navigate to steps detail view
   const handleStepsPress = () => {
     const currentUserId = auth().currentUser?.uid;
     if (currentUserId) {
       navigation.navigate('StepsGraph', {studentId: currentUserId});
     }
   };
+
+  // Extract health data fetching into a reusable function
+  const fetchHealthData = useCallback(() => {
+    if (!isIOS) return;
+
+    getDailyStepCount((data: HealthDataWithScore) => {
+      if (data && data.value !== null) {
+        setSteps(data);
+      } else {
+        setSteps(null);
+      }
+    });
+
+    getHeartRate((data: HealthDataWithScore) => {
+      if (data && data.value !== null) {
+        setHeartRateState(data);
+      } else {
+        setHeartRateState(null);
+      }
+    });
+
+    getBloodPressure((data: BloodPressureData) => {
+      if (data && data.sys !== null && data.dia !== null) {
+        setBP(data);
+      } else {
+        setBP(null);
+      }
+    });
+
+    getSleepData(setSleep);
+    getHeightWeightAndBMI(setHW);
+  }, [isIOS]);
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    
+    AppleHealthKit.initHealthKit(permissions, err => {
+      if (err) {
+        console.error('HealthKit not initialized:', err);
+        setRefreshing(false);
+        return;
+      }
+
+      fetchHealthData();
+      
+      // Give a slight delay for better UX
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 500);
+    });
+  }, [fetchHealthData]);
 
   useEffect(() => {
     if (!isIOS) return;
@@ -119,34 +171,9 @@ const DashboardScreen = ({navigation}: Props) => {
         return;
       }
 
-      getDailyStepCount((data: HealthDataWithScore) => {
-        if (data && data.value !== null) {
-          setSteps(data);
-        } else {
-          setSteps(null);
-        }
-      });
-
-      getHeartRate((data: HealthDataWithScore) => {
-        if (data && data.value !== null) {
-          setHeartRateState(data);
-        } else {
-          setHeartRateState(null);
-        }
-      });
-
-      getBloodPressure((data: BloodPressureData) => {
-        if (data && data.sys !== null && data.dia !== null) {
-          setBP(data);
-        } else {
-          setBP(null);
-        }
-      });
-
-      getSleepData(setSleep);
-      getHeightWeightAndBMI(setHW);
+      fetchHealthData();
     });
-  }, [isIOS]);
+  }, [isIOS, fetchHealthData]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -194,7 +221,17 @@ const DashboardScreen = ({navigation}: Props) => {
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FF" />
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#8B5CF6"
+            colors={['#8B5CF6']}
+            title="Syncing with Health..."
+            titleColor="#6B7280"
+          />
+        }>
         {/* Header Section */}
         <View style={styles.header}>
           <Image
@@ -222,7 +259,6 @@ const DashboardScreen = ({navigation}: Props) => {
         </View>
 
         {/* Full Width Stats Cards */}
-        {/* ✅ UPDATED: Pass onPress to QuickStatCard for Steps */}
         <QuickStatCard
           title="Steps"
           value={
@@ -242,10 +278,9 @@ const DashboardScreen = ({navigation}: Props) => {
           date={steps?.date}
           formatDate={formatDate}
           onPress={handleStepsPress}
-          titleColor="#e6602cff" // ← Add this with your desired color
+          titleColor="#e6602cff"
         />
 
-        {/* ✅ UPDATED: Pass onPress to QuickStatCard for Heart Rate */}
         <QuickStatCard
           title="Heart Rate"
           value={heartRate?.value ? `${heartRate.value}` : '---'}
@@ -262,7 +297,7 @@ const DashboardScreen = ({navigation}: Props) => {
           date={heartRate?.date}
           formatDate={formatDate}
           onPress={handleHeartRatePress}
-          titleColor="#EF4444" // ← Add this with your desired color
+          titleColor="#EF4444"
         />
 
         <TouchableOpacity
@@ -337,7 +372,6 @@ const DashboardScreen = ({navigation}: Props) => {
           color="#F97316"
           score={bpScore}
           titleColor="#b62610ff">
-            
           <View style={styles.bpContainer}>
             <View style={styles.bpReading}>
               <Text style={styles.bpValue}>{bp?.sys || '--'}</Text>
@@ -355,7 +389,16 @@ const DashboardScreen = ({navigation}: Props) => {
           )}
         </DetailCard>
 
-        <DetailCard title="Body Metrics" icon="📊" color="#10B981">
+        <DetailCard
+          title="Body Metrics"
+          icon={
+            <Image
+              source={require('../Assets/bmi.png')}
+              style={{width: 45, height: 45, marginBottom: -5, marginLeft: -3}}
+              resizeMode="contain"
+            />
+          }
+          color="#10B981">
           <View style={styles.metricsGrid}>
             <MetricItem
               label="Weight"
@@ -400,7 +443,7 @@ const DashboardScreen = ({navigation}: Props) => {
   );
 };
 
-// ✅ UPDATED: Add onPress prop to QuickStatCard
+// Component definitions remain the same...
 const QuickStatCard = ({
   title,
   value,
@@ -411,7 +454,7 @@ const QuickStatCard = ({
   date,
   formatDate,
   onPress,
-  titleColor, // ← Add this
+  titleColor,
 }: {
   title: string;
   value: string;
@@ -422,7 +465,7 @@ const QuickStatCard = ({
   date?: string | null;
   formatDate?: (dateString: string) => string;
   onPress?: () => void;
-  titleColor?: string; // ← Add this
+  titleColor?: string;
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
     if (s === null || s === undefined) return '#9CA3AF';
@@ -487,7 +530,7 @@ const DetailCard = ({
   children,
   score,
   iconColor,
-  titleColor,  // ← Add this
+  titleColor,
 }: {
   title: string;
   icon?: React.ReactNode;
@@ -495,7 +538,7 @@ const DetailCard = ({
   iconColor?: string;
   children: React.ReactNode;
   score?: number | null;
-  titleColor?: string;  // ← Add this
+  titleColor?: string;
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
     if (s === null || s === undefined) return '#9CA3AF';
@@ -524,7 +567,9 @@ const DetailCard = ({
             ]}>
             <Text style={styles.cardIcon}>{icon}</Text>
           </View>
-          <Text style={[styles.cardTitle, titleColor && {color: titleColor}]}>{title}</Text>
+          <Text style={[styles.cardTitle, titleColor && {color: titleColor}]}>
+            {title}
+          </Text>
         </View>
         {score !== null && score !== undefined && (
           <View
