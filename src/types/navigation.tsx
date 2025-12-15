@@ -10,4 +10,12 @@ export type RootStackParamList = {
   HeartRateGraph: {studentId: string};
   StepsGraph: {studentId: string};
   ManualSleepTracker: undefined;
+  Messages: undefined;
+  ChatScreen: {
+    conversationId: string;
+    otherPersonName: string;
+    otherPersonId: string;
+  };
+  NewConversation: undefined; // Only for counselors
+    CounselorStudentList: undefined;
 };

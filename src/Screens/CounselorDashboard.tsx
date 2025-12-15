@@ -9,9 +9,9 @@ import {
 import Svg, {Path, G, Rect} from 'react-native-svg';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
-import { RootStackParamList } from '../types/navigation';
-import { useFocusEffect } from '@react-navigation/native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import {RootStackParamList} from '../types/navigation';
+import {useFocusEffect} from '@react-navigation/native';
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 // --- Icon Component ---
 const WarningIcon = ({color = '#FF6F61'}) => (
@@ -66,13 +66,11 @@ const todaysSchedule = [
   },
 ];
 
-
 type Props = NativeStackScreenProps<RootStackParamList, 'CounselorDashboard'>;
 
-const CounselorDashboard = ({ navigation }: Props) => {
+const CounselorDashboard = ({navigation}: Props) => {
   const [activeStudents, setActiveStudents] = useState<number | null>(null);
   const [counselorName, setCounselorName] = useState<string>('Loading...');
-
 
   // --- Data Fetching Functions ---
 
@@ -107,8 +105,12 @@ const CounselorDashboard = ({ navigation }: Props) => {
 
       console.log('Fetching counselor name for UID:', currentCounselorId);
 
-      if (!counselorDocument.exists) { // <-- Check if the document exists
-        console.log('Error: No counselor document found for UID:', currentCounselorId);
+      if (!counselorDocument.exists) {
+        // <-- Check if the document exists
+        console.log(
+          'Error: No counselor document found for UID:',
+          currentCounselorId,
+        );
         setCounselorName('Unknown Counselor');
         return;
       }
@@ -118,16 +120,15 @@ const CounselorDashboard = ({ navigation }: Props) => {
 
       // Make sure 'data' is not undefined before accessing 'fullName'
       if (data && data.fullName) {
-          // Extract the 'fullName' field.
-          const name = data.fullName;
+        // Extract the 'fullName' field.
+        const name = data.fullName;
 
-          // Update the state.
-          setCounselorName(name);
+        // Update the state.
+        setCounselorName(name);
       } else {
-          console.error('Error: Document exists but is missing fullName field.');
-          setCounselorName('Name Missing');
+        console.error('Error: Document exists but is missing fullName field.');
+        setCounselorName('Name Missing');
       }
-
     } catch (error) {
       console.error('Error fetching counselor name: ', error);
       setCounselorName('Error Loading Name');
@@ -153,25 +154,30 @@ const CounselorDashboard = ({ navigation }: Props) => {
       return () => {
         // Optional cleanup
       };
-    }, [])
+    }, []),
   );
-
 
   // --- Render Block ---
   return (
     <View style={styles.fullContainer}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View>
-          {/* Displaying the fetched name */}
-          <Text style={styles.welcomeUser}>Hello {counselorName}!</Text>
+        {/* Header Section with Messages Button */}
+        <View style={styles.header}>
+          <View style={styles.headerText}>
+            <Text style={styles.welcomeUser}>Hello {counselorName}!</Text>
+            <Text style={styles.appTitle}>Student Support Hub</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.messageButton}
+            onPress={() => navigation.navigate('Messages')}
+            activeOpacity={0.7}>
+            <Text style={styles.messageIcon}>💬</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.appTitle}>Student Support Hub</Text>
         <View>
-
           <Card onPress={() => navigation.navigate('ListStudent')}>
             <View style={styles.cardContainerColumn}>
               <Svg width={80} height={80} viewBox="0 0 200 200">
-
                 <G fill="#4b84abff" scale="0.4" x={20} y={30}>
                   <Path
                     d="M363.663,294.916c0-18.823-13.48-34.545-31.289-38.05v-25.655c0-2.333-1.086-4.534-2.938-5.953
@@ -333,13 +339,11 @@ const CounselorDashboard = ({ navigation }: Props) => {
           {/* --- Quick Actions Card (Existing) --- */}
           <Card title="Quick Actions">
             <View style={styles.gridContainer}>
-
               {/* --- Box 1 (MODIFIED for Add Student) --- */}
               <TouchableOpacity
                 style={styles.boxWrapper}
                 activeOpacity={0.7}
-                onPress={() => navigation.navigate('AddStudentScreen')}
-              >
+                onPress={() => navigation.navigate('AddStudentScreen')}>
                 <View style={[styles.box, styles.box1]}>
                   {/* ... (plus icon) ... */}
                   <Svg width={35} height={35} viewBox="0 0 200 200">
@@ -546,13 +550,11 @@ const Card = ({
   children?: React.ReactNode;
   onPress?: () => void;
 }) => (
-
   <TouchableOpacity
     style={styles.card}
     onPress={onPress}
     disabled={!onPress}
-    activeOpacity={onPress ? 0.7 : 1.0}
-  >
+    activeOpacity={onPress ? 0.7 : 1.0}>
     {title && <Text style={styles.cardTitle}>{title}</Text>}
     {children}
   </TouchableOpacity>
@@ -574,16 +576,26 @@ const ValueText = ({
 // --- Stylesheet ---
 const styles = StyleSheet.create({
   fullContainer: {flex: 1, backgroundColor: '#d3dbf5ff'},
-  scrollContainer: {padding: 20, paddingBottom: 80},
-  appTitle: {
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#000000ff',
-    textAlign: 'left',
-    marginTop: 40,
-    marginBottom: 25,
-    letterSpacing: 1,
-  },
+scrollContainer: {padding: 20, paddingTop: 60, paddingBottom: 80},
+header: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  marginBottom: 10,
+  gap: 16,
+},
+headerText: {
+  flex: 1,
+},
+appTitle: {
+  fontSize: 28,
+  fontWeight: '600',
+  color: '#000000ff',
+  textAlign: 'left',
+  marginTop: 5,
+  marginBottom: 25,
+  letterSpacing: 1,
+},
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -774,6 +786,23 @@ const styles = StyleSheet.create({
     color: '#555',
     fontWeight: '600',
     marginBottom: 4,
+  },
+messageButton: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: '#FFFFFF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: {width: 0, height: 2},
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3,
+  marginTop: 50,
+},
+  messageIcon: {
+    fontSize: 24,
   },
 });
 

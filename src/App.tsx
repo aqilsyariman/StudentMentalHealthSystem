@@ -17,7 +17,9 @@ import AddStudentScreen from './Screens/AddStudentScreen';
 import HeartRateGraph from './Screens/GraphScreen/HeartRateGraph';
 import StepsGraph from './Screens/GraphScreen/StepsGraph';
 import ManualSleepTracker from './Screens/ManualSleepTracker';
-
+import Messages from './Screens/Messages';
+import CounselorStudentList from './Screens/CounselorStudentList';
+import ChatScreen from './Screens/ChatScreen';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
@@ -135,6 +137,16 @@ const App = () => {
               component={ManualSleepTracker}
            
             />
+             <Stack.Screen
+              options={{headerShown: false, title: 'Messages'}}
+              name="Messages"
+              component={Messages}
+            />
+              <Stack.Screen
+              options={{headerShown: false, title: 'ChatScreen'}}
+              name="ChatScreen"
+              component={ChatScreen}
+            />
           </Stack.Group>
         ) : (
           // --- 4. LOGGED IN (Counselor) ---
@@ -167,6 +179,21 @@ const App = () => {
               options={{headerShown: true, title: 'Steps Count Graph'}}
               name="StepsGraph"
               component={StepsGraph}
+            />
+            <Stack.Screen
+              options={{headerShown: false, title: 'Messages'}}
+              name="Messages"
+              component={Messages}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'CounselorStudentList'}}
+              name="CounselorStudentList"
+              component={CounselorStudentList}
+            />
+            <Stack.Screen
+              options={{headerShown: false, title: 'ChatScreen'}}
+              name="ChatScreen"
+              component={ChatScreen}
             />
           </Stack.Group>
         )}

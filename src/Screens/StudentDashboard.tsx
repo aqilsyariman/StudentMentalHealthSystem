@@ -197,10 +197,24 @@ const DashboardScreen = ({navigation}: Props) => {
         showsVerticalScrollIndicator={false}>
         {/* Header Section */}
         <View style={styles.header}>
-          <View>
+          <Image
+            style={styles.profileCircle}
+            source={{
+              uri:
+                auth().currentUser?.photoURL ||
+                `https://i.pravatar.cc/150?u=${auth().currentUser?.email}`,
+            }}
+          />
+          <View style={styles.headerText}>
             <Text style={styles.greeting}>Hello, Aqil! 👋</Text>
             <Text style={styles.subtitle}>Here's your health overview</Text>
           </View>
+          <TouchableOpacity 
+            style={styles.messageButton}
+            onPress={() => navigation.navigate('Messages')}
+            activeOpacity={0.7}>
+            <Text style={styles.messageIcon}>💬</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Full Width Stats Cards */}
@@ -313,24 +327,6 @@ const DashboardScreen = ({navigation}: Props) => {
           )}
         </DetailCard>
 
-        {/* <DetailCard title="Sleep Analysis" icon="😴" color="#6366F1">
-          {sleep?.summary ? (
-            <View style={styles.sleepGrid}>
-              <SleepStat label="In Bed" value={sleep.summary.inBed} />
-              <SleepStat label="Asleep" value={sleep.summary.asleep} />
-              <SleepStat label="Awake" value={sleep.summary.awake} />
-              <SleepStat label="REM" value={sleep.summary.rem} highlight />
-              <SleepStat label="Deep" value={sleep.summary.deep} highlight />
-              <SleepStat label="Core" value={sleep.summary.core} />
-            </View>
-          ) : (
-            <Text style={styles.noData}>No sleep data available</Text>
-          )}
-          {sleep?.date && (
-            <Text style={styles.timestamp}>{formatDate(sleep.date)}</Text>
-          )}
-        </DetailCard> */}
-
         <DetailCard title="Body Metrics" icon="📊" color="#10B981">
           <View style={styles.metricsGrid}>
             <MetricItem
@@ -396,7 +392,7 @@ const QuickStatCard = ({
   score?: number | null;
   date?: string | null;
   formatDate?: (dateString: string) => string;
-  onPress?: () => void; // ✅ Add this
+  onPress?: () => void;
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
     if (s === null || s === undefined) return '#9CA3AF';
@@ -406,7 +402,6 @@ const QuickStatCard = ({
     return '#EF4444';
   };
 
-  // ✅ Wrap the entire card in TouchableOpacity if onPress is provided
   const CardContent = (
     <View style={styles.quickStatCard}>
       {score !== null && score !== undefined && (
@@ -441,7 +436,6 @@ const QuickStatCard = ({
     </View>
   );
 
-  // ✅ If onPress exists, wrap in TouchableOpacity
   if (onPress) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
@@ -450,7 +444,6 @@ const QuickStatCard = ({
     );
   }
 
-  // ✅ Otherwise, return just the card
   return CardContent;
 };
 
@@ -539,16 +532,45 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 32,
+    gap: 16,
+  },
+  profileCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#8B5CF6',
+    shadowColor: '#8B5CF6',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  headerText: {
+    flex: 1,
+  },
+  messageButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  messageIcon: {
+    fontSize: 24,
   },
   greeting: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     color: '#1F2937',
     marginBottom: 4,
-    marginTop: 40,
   },
   subtitle: {
     fontSize: 16,
