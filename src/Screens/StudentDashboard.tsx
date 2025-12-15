@@ -209,11 +209,15 @@ const DashboardScreen = ({navigation}: Props) => {
             <Text style={styles.greeting}>Hello, Aqil! 👋</Text>
             <Text style={styles.subtitle}>Here's your health overview</Text>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.messageButton}
             onPress={() => navigation.navigate('Messages')}
             activeOpacity={0.7}>
-            <Text style={styles.messageIcon}>💬</Text>
+            <Image
+              source={require('../Assets/chat.png')}
+              style={{width: 40, height: 40}}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
 
@@ -226,12 +230,19 @@ const DashboardScreen = ({navigation}: Props) => {
               ? steps.value.toLocaleString()
               : '---'
           }
-          icon="👟"
+          icon={
+            <Image
+              source={require('../Assets/burn.png')}
+              style={{width: 35, height: 35, marginBottom: -10}}
+              resizeMode="contain"
+            />
+          }
           color="#8B5CF6"
           score={stepCountScore}
           date={steps?.date}
           formatDate={formatDate}
           onPress={handleStepsPress}
+          titleColor="#e6602cff" // ← Add this with your desired color
         />
 
         {/* ✅ UPDATED: Pass onPress to QuickStatCard for Heart Rate */}
@@ -251,6 +262,7 @@ const DashboardScreen = ({navigation}: Props) => {
           date={heartRate?.date}
           formatDate={formatDate}
           onPress={handleHeartRatePress}
+          titleColor="#EF4444" // ← Add this with your desired color
         />
 
         <TouchableOpacity
@@ -264,9 +276,17 @@ const DashboardScreen = ({navigation}: Props) => {
                   styles.cardIconBadge,
                   {backgroundColor: '#6366F1' + '15'},
                 ]}>
-                <Text style={styles.cardIcon}>😴</Text>
+                <Text style={styles.cardIcon}>
+                  <Image
+                    source={require('../Assets/moon.png')}
+                    style={{width: 30, height: 30, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
               </View>
-              <Text style={styles.cardTitle}>Sleep Analysis</Text>
+              <Text style={[styles.cardTitle, {color: '#722fdeff'}]}>
+                Sleep Analysis
+              </Text>
             </View>
             <Text style={styles.tapToLogText}>Tap to Log</Text>
           </View>
@@ -307,9 +327,17 @@ const DashboardScreen = ({navigation}: Props) => {
         {/* Main Health Cards */}
         <DetailCard
           title="Blood Pressure"
-          icon="🩺"
+          icon={
+            <Image
+              source={require('../Assets/blood-pressure.png')}
+              style={{width: 45, height: 45, marginBottom: -5, marginLeft: -3}}
+              resizeMode="contain"
+            />
+          }
           color="#F97316"
-          score={bpScore}>
+          score={bpScore}
+          titleColor="#b62610ff">
+            
           <View style={styles.bpContainer}>
             <View style={styles.bpReading}>
               <Text style={styles.bpValue}>{bp?.sys || '--'}</Text>
@@ -383,6 +411,7 @@ const QuickStatCard = ({
   date,
   formatDate,
   onPress,
+  titleColor, // ← Add this
 }: {
   title: string;
   value: string;
@@ -393,6 +422,7 @@ const QuickStatCard = ({
   date?: string | null;
   formatDate?: (dateString: string) => string;
   onPress?: () => void;
+  titleColor?: string; // ← Add this
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
     if (s === null || s === undefined) return '#9CA3AF';
@@ -423,7 +453,10 @@ const QuickStatCard = ({
           <Text style={styles.iconEmoji}>{icon}</Text>
         </View>
         <View style={styles.quickStatInfo}>
-          <Text style={styles.quickStatTitle}>{title}</Text>
+          <Text
+            style={[styles.quickStatTitle, titleColor && {color: titleColor}]}>
+            {title}
+          </Text>
           <View style={styles.quickStatValueContainer}>
             <Text style={styles.quickStatValue}>{value}</Text>
             {unit && <Text style={styles.quickStatUnit}>{unit}</Text>}
@@ -453,12 +486,16 @@ const DetailCard = ({
   color,
   children,
   score,
+  iconColor,
+  titleColor,  // ← Add this
 }: {
   title: string;
-  icon: string;
+  icon?: React.ReactNode;
   color: string;
+  iconColor?: string;
   children: React.ReactNode;
   score?: number | null;
+  titleColor?: string;  // ← Add this
 }) => {
   const getScoreColor = (s: number | null | undefined) => {
     if (s === null || s === undefined) return '#9CA3AF';
@@ -480,10 +517,14 @@ const DetailCard = ({
     <View style={styles.detailCard}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          <View style={[styles.cardIconBadge, {backgroundColor: color + '15'}]}>
+          <View
+            style={[
+              styles.cardIconBadge,
+              {backgroundColor: (iconColor || color) + '15'},
+            ]}>
             <Text style={styles.cardIcon}>{icon}</Text>
           </View>
-          <Text style={styles.cardTitle}>{title}</Text>
+          <Text style={[styles.cardTitle, titleColor && {color: titleColor}]}>{title}</Text>
         </View>
         {score !== null && score !== undefined && (
           <View
@@ -546,31 +587,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+    marginTop: 30,
   },
   headerText: {
     flex: 1,
   },
   messageButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  messageIcon: {
-    fontSize: 24,
+    marginTop: 30,
   },
   greeting: {
     fontSize: 28,
     fontWeight: '800',
     color: '#1F2937',
     marginBottom: 4,
+    marginTop: 30,
   },
   subtitle: {
     fontSize: 16,
@@ -639,9 +673,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickStatTitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#6B7280',
-    fontWeight: '600',
+    fontWeight: '800',
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -651,7 +685,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   quickStatValue: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
     color: '#1F2937',
   },
@@ -713,8 +747,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardIconBadge: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -832,7 +866,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9CA3AF',
     fontWeight: '500',
-    marginTop: 8,
+    textAlign: 'right',
   },
   noData: {
     fontSize: 15,
