@@ -148,9 +148,12 @@ const StepsGraph = ({route}: StudentDetailProps) => {
     }
 
     const labels = stepCounthistory.map((reading, index) => {
-      if (index % 2 === 0) {
+      // Show every other label to avoid crowding
+      if (index % 2 === 0 || stepCounthistory.length <= 5) {
         const date = reading.timestamp.toDate ? reading.timestamp.toDate() : new Date(reading.timestamp);
-        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        const month = (date.getMonth() + 1).toString();
+        const day = date.getDate().toString();
+        return `${month}/${day}`;
       }
       return '';
     });
@@ -161,8 +164,8 @@ const StepsGraph = ({route}: StudentDetailProps) => {
       labels,
       datasets: [{
         data,
-        color: (opacity = 1) => `rgba(255, 111, 97, ${opacity})`,
-        strokeWidth: 2,
+        color: (opacity = 1) => `rgba(111, 91, 225, ${opacity})`,
+        strokeWidth: 3,
       }],
     };
   };
@@ -188,29 +191,38 @@ const StepsGraph = ({route}: StudentDetailProps) => {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Profile Header Card */}
         <View style={styles.profileHeader}>
-          <Image
-            style={styles.avatar}
-            source={{
-              uri:
-                student?.avatar ||
-                `https://i.pravatar.cc/150?u=${student?.email}`,
-            }}
-          />
+          <View style={styles.avatarContainer}>
+            <Image
+              style={styles.avatar}
+              source={{
+                uri:
+                  student?.avatar ||
+                  `https://i.pravatar.cc/150?u=${student?.email}`,
+              }}
+            />
+          </View>
           <Text style={styles.studentName}>{student?.fullName}</Text>
           <Text style={styles.studentEmail}>{student?.email}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}> Step Count Monitor</Text>
+        <Text style={styles.sectionTitle}>📊 Step Count Monitor</Text>
 
-        {/* Current Heart Rate Card */}
+        {/* Current Step Count Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Current Step Count</Text>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Current Step Count</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Live</Text>
+            </View>
+          </View>
           <View style={styles.sensorCardContainer}>
-            <StepIcon />
+            <View style={styles.iconContainer}>
+              <StepIcon size={48} />
+            </View>
             <View style={styles.sensorTextContainer}>
               <Text style={styles.sensorValue}>
                 {latestStepCount || '--'}
-                <Text style={styles.sensorUnit}> BPM</Text>
+                <Text style={styles.sensorUnit}> steps</Text>
               </Text>
               <Text style={styles.sensorTimestamp}>
                 Last update: {formatTimestamp(latestTimestamp)}
@@ -219,45 +231,65 @@ const StepsGraph = ({route}: StudentDetailProps) => {
           </View>
         </View>
 
-        {/* Heart Rate History Graph */}
+        {/* Step Count History Graph */}
         {stepCounthistory.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Step Count History</Text>
-            <LineChart
-              data={getChartData()}
-              width={screenWidth - 80}
-              height={220}
-              chartConfig={{
-                backgroundColor: '#ffffff',
-                backgroundGradientFrom: '#ffffff',
-                backgroundGradientTo: '#ffffff',
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(111, 91, 225, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                style: {
-                  borderRadius: 16,
-                },
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: '#FF6F61',
-                },
-              }}
-              bezier
-              style={{
-                marginVertical: 8,
-                borderRadius: 16,
-              }}
-            />
-            <Text style={styles.chartNote}>
-              Showing last {stepCounthistory.length} readings
-            </Text>
+            <Text style={styles.cardTitle}>Step Count Trends</Text>
+            <View style={styles.chartContainer}>
+              <LineChart
+                data={getChartData()}
+                width={screenWidth - 80}
+                height={240}
+                chartConfig={{
+                  backgroundColor: '#f8f9ff',
+                  backgroundGradientFrom: '#f8f9ff',
+                  backgroundGradientTo: '#ffffff',
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(111, 91, 225, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
+                  style: {
+                    borderRadius: 16,
+                  },
+                  propsForDots: {
+                    r: '5',
+                    strokeWidth: '3',
+                    stroke: '#6f5be1ff',
+                    fill: '#ffffff',
+                  },
+                  propsForBackgroundLines: {
+                    strokeDasharray: '',
+                    stroke: '#e0e0e0',
+                    strokeWidth: 1,
+                  },
+                }}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={true}
+                withVerticalLines={false}
+                withHorizontalLines={true}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+              />
+            </View>
+            <View style={styles.chartFooter}>
+              <Text style={styles.chartNote}>
+                📅 Showing last {stepCounthistory.length} readings
+              </Text>
+              <Text style={styles.chartSubNote}>
+                Dates displayed as MM/DD
+              </Text>
+            </View>
           </View>
         )}
 
         {stepCounthistory.length === 0 && (
           <View style={styles.card}>
-            <Text style={styles.noDataText}>No step count history available</Text>
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataIcon}>📊</Text>
+              <Text style={styles.noDataText}>No step count history available</Text>
+              <Text style={styles.noDataSubText}>Data will appear once readings are recorded</Text>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -266,7 +298,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
 };
 
 const styles = StyleSheet.create({
-  fullContainer: {flex: 1, backgroundColor: '#d3dbf5ff'},
+  fullContainer: {flex: 1, backgroundColor: '#f0f3ff'},
   scrollContainer: {padding: 20, paddingBottom: 80},
   centerContainer: {
     flex: 1,
@@ -276,92 +308,167 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#555',
+    color: '#6f5be1ff',
+    fontWeight: '600',
   },
   errorText: {
     fontSize: 16,
     color: '#FF6F61',
+    fontWeight: '600',
   },
   profileHeader: {
     alignItems: 'center',
-    marginBottom: 20,
-    padding: 20,
+    marginBottom: 24,
+    padding: 24,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
+    shadowColor: '#6f5be1ff',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  avatarContainer: {
+    shadowColor: '#6f5be1ff',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+    borderRadius: 60,
+    marginBottom: 16,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 15,
+    borderWidth: 4,
+    borderColor: '#f0f3ff',
   },
   studentName: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#333',
+    marginBottom: 4,
   },
   studentEmail: {
-    fontSize: 16,
-    color: '#777',
-    marginTop: 4,
+    fontSize: 15,
+    color: '#888',
+    marginTop: 2,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#333',
-    marginBottom: 10,
-    marginTop: 10,
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    shadowColor: '#6f5be1ff',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#6f5be1ff',
+  },
+  badge: {
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    color: '#4caf50',
+    fontSize: 12,
+    fontWeight: '700',
   },
   sensorCardContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 15,
+    gap: 20,
+  },
+  iconContainer: {
+    backgroundColor: '#f0f3ff',
+    padding: 16,
+    borderRadius: 16,
   },
   sensorTextContainer: {
     flex: 1,
   },
   sensorValue: {
-    fontSize: 36,
-    fontWeight: '800',
+    fontSize: 40,
+    fontWeight: '900',
     color: '#333',
+    letterSpacing: -1,
   },
   sensorUnit: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#555',
+    color: '#666',
   },
   sensorTimestamp: {
     fontSize: 13,
-    color: '#777',
-    marginTop: 4,
+    color: '#999',
+    marginTop: 6,
   },
-  card: {
-    backgroundColor: '#FFFFFF',
+  chartContainer: {
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  chart: {
+    marginVertical: 8,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#7B68EE',
-    shadowOffset: {width: 0, height: 6},
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 20,
-    color: '#6f5be1ff',
+  chartFooter: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
   chartNote: {
-    fontSize: 12,
-    color: '#777',
+    fontSize: 13,
+    color: '#666',
     textAlign: 'center',
-    marginTop: 8,
+    fontWeight: '600',
+  },
+  chartSubNote: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  noDataContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  noDataIcon: {
+    fontSize: 48,
+    marginBottom: 12,
   },
   noDataText: {
     fontSize: 16,
-    color: '#777',
+    color: '#666',
     textAlign: 'center',
+    fontWeight: '600',
+  },
+  noDataSubText: {
+    fontSize: 13,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 6,
   },
 });
 

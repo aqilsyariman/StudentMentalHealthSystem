@@ -24,8 +24,13 @@ const calculateStepCountScore = (steps: number): number => {
 
 const SAVE_TO_FIRESTORE = true;
 
+// 🎯 FIX: Use UTC methods to ensure the date key matches the day the steps were recorded in HealthKit/Mock, 
+// preventing timezone shifts from altering the date.
 const getLocalDateString = (date: Date) => {
-  return date.toISOString().split('T')[0];
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export const getDailyStepCount = (
@@ -34,87 +39,91 @@ export const getDailyStepCount = (
   const user = auth().currentUser;
   if (!user) {
     console.warn('User not authenticated for step count.');
-    callback({ value: null, date: null });
+    callback({ value: null, date: null, score: null });
     return;
   }
 
-  // ✅ Get last 7 days of data
   const now = new Date();
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(now.getDate() - 7);
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(now.getFullYear() - 1);
 
   const options: HealthInputOptions = {
-    startDate: sevenDaysAgo.toISOString(),
+    startDate: oneYearAgo.toISOString(),
     endDate: now.toISOString(),
     ascending: false, // Most recent first
   };
 
-  console.log('📅 Fetching steps from last 7 days...');
+  console.log('📅 Fetching step data from last year...');
 
   AppleHealthKit.getDailyStepCountSamples(
     options,
     async (err: any, results: HealthValue[]) => {
       if (err || !results || results.length === 0) {
-        console.error('Error fetching step count:', err);
+        console.error('❌ Error fetching step count:', err);
         callback({ value: null, date: null, score: null });
         return;
       }
 
       console.log(`📊 Found ${results.length} step samples`);
 
-      // ✅ KEY FIX: Group by date and sum the steps for each day
-      const stepsByDate: { [key: string]: { total: number; samples: HealthValue[] } } = {};
+      // ✅ Group samples by date and sum steps + track latest timestamp per day
+      const stepsByDate: { 
+        [key: string]: { 
+          total: number; 
+          latestTimestamp: Date;
+        } 
+      } = {};
 
       results.forEach((sample) => {
-        const sampleDate = new Date(sample.startDate);
-        const dateKey = getLocalDateString(sampleDate);
+        // Use the endDate from the sample (which is what HealthKit uses to define the day)
+        const sampleEndDate = new Date(sample.endDate || sample.startDate);
+        
+        // Use the corrected UTC date key generation
+        const dateKey = getLocalDateString(sampleEndDate);
 
         if (!stepsByDate[dateKey]) {
-          stepsByDate[dateKey] = { total: 0, samples: [] };
+          stepsByDate[dateKey] = { 
+            total: 0, 
+            latestTimestamp: sampleEndDate 
+          };
         }
 
+        // Sum the steps
         stepsByDate[dateKey].total += sample.value;
-        stepsByDate[dateKey].samples.push(sample);
+
+        // Keep track of the latest (most recent) timestamp for this day
+        if (sampleEndDate > stepsByDate[dateKey].latestTimestamp) {
+          stepsByDate[dateKey].latestTimestamp = sampleEndDate;
+        }
       });
 
-      console.log('📊 Steps grouped by date:', JSON.stringify(stepsByDate, null, 2));
-
-      // ✅ Get the most recent day with non-zero steps
-      const sortedDates = Object.keys(stepsByDate).sort().reverse(); // Most recent first
+      // ✅ Find the most recent day with any recorded steps.
+      const sortedDates = Object.keys(stepsByDate).sort().reverse(); 
       
       let selectedDate: string | null = null;
       let totalSteps = 0;
+      let latestTimestamp: Date | null = null;
 
+      // Select the VERY first (most recent) day key found.
       for (const dateKey of sortedDates) {
-        if (stepsByDate[dateKey].total > 0) {
-          selectedDate = dateKey;
-          totalSteps = Math.round(stepsByDate[dateKey].total);
-          break;
-        }
+        selectedDate = dateKey;
+        totalSteps = Math.round(stepsByDate[dateKey].total);
+        latestTimestamp = stepsByDate[dateKey].latestTimestamp;
+        
+        console.log(`✅ Selected most recent day: ${dateKey} with ${totalSteps} total steps`);
+        console.log(`   Last recorded at: ${latestTimestamp.toLocaleString()}`);
+        break; // Stop immediately after selecting the most recent day
       }
 
-      if (!selectedDate) {
-        console.warn('⚠️ No step data found in last 7 days');
+      if (!selectedDate || !latestTimestamp) {
+        console.warn('⚠️ No step data found in last year');
         callback({ value: null, date: null, score: null });
         return;
       }
 
-      console.log(`✅ Selected date: ${selectedDate} with ${totalSteps} total steps`);
-
-      // Get the most recent sample from that day for the timestamp
-      const latestSample = stepsByDate[selectedDate].samples[0];
-      const readingDate = new Date(latestSample.endDate || latestSample.startDate);
-
       const stepCountScore = calculateStepCountScore(totalSteps);
 
-      const newReadingData = {
-        value: totalSteps,
-        score: stepCountScore,
-        timestamp: firestore.Timestamp.fromDate(readingDate),
-      };
-
-      const dateKey = getLocalDateString(readingDate);
-
+      // ✅ Save to Firestore with duplicate prevention
       if (SAVE_TO_FIRESTORE) {
         try {
           const sensorDocRef = firestore()
@@ -123,26 +132,73 @@ export const getDailyStepCount = (
             .collection('sensorData')
             .doc('stepCount');
 
-          await sensorDocRef.set(
-            {
-              data: {
-                [dateKey]: firestore.FieldValue.arrayUnion(newReadingData),
+          const doc = await sensorDocRef.get();
+          const existingData = doc.data();
+
+          let existingTimestamp = null;
+          let shouldUpdate = true;
+
+          if (existingData?.data?.[selectedDate]) {
+            const dayData = existingData.data[selectedDate];
+            const lastReading = dayData[dayData.length - 1];
+            
+            if (lastReading?.value === totalSteps) {
+              console.log('⏭️ Same step count for this day, using existing timestamp');
+              shouldUpdate = false;
+              existingTimestamp = lastReading.timestamp;
+            }
+          }
+
+          // Use the existing timestamp if found, otherwise create a new one from the latest HealthKit timestamp.
+          const timestampToUse = existingTimestamp || firestore.Timestamp.fromDate(latestTimestamp);
+          
+          const readingData = {
+            value: totalSteps,
+            score: stepCountScore,
+            timestamp: timestampToUse,
+          };
+
+          if (shouldUpdate) {
+            await sensorDocRef.set(
+              {
+                data: {
+                  [selectedDate]: [readingData],
+                },
               },
-            },
-            { merge: true },
-          );
+              { merge: true }
+            );
 
-          console.log(`✅ Saved step count: ${totalSteps} steps (Score: ${stepCountScore}) for ${dateKey}`);
+            console.log(`✅ Saved step count: ${totalSteps} steps (Score: ${stepCountScore}) for ${selectedDate}`);
+          }
+
+          // Return with the correct timestamp
+          // Note: latestTimestamp is a Date object derived from HealthKit. Its toISOString() uses UTC.
+          const displayDate = existingTimestamp 
+            ? existingTimestamp.toDate().toISOString() 
+            : latestTimestamp.toISOString();
+          
+          callback({
+            value: totalSteps,
+            date: displayDate,
+            score: stepCountScore,
+          });
+
         } catch (saveErr: any) {
-          console.error('❌ Firestore save failed (steps):', saveErr.message);
+          console.error('❌ Firestore save failed:', saveErr.message);
+          
+          callback({
+            value: totalSteps,
+            date: latestTimestamp.toISOString(),
+            score: stepCountScore,
+          });
         }
+      } else {
+        callback({
+          value: totalSteps,
+          date: latestTimestamp.toISOString(),
+          score: stepCountScore,
+        });
       }
-
-      callback({ 
-        value: totalSteps, 
-        date: readingDate.toISOString(),
-        score: stepCountScore,
-      });
     }
   );
 };
