@@ -18,5 +18,6 @@ export type RootStackParamList = {
   };
   NewConversation: undefined; // Only for counselors
     CounselorStudentList: undefined;
+  HealthScoreScreen: undefined;
 
 };

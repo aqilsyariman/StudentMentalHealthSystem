@@ -20,6 +20,8 @@ import ManualSleepTracker from './Screens/ManualSleepTracker';
 import Messages from './Screens/Messages';
 import CounselorStudentList from './Screens/CounselorStudentList';
 import ChatScreen from './Screens/ChatScreen';
+import HealthScoreScreen from './Screens/GraphScreen/HealthScoreScreen';
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
@@ -146,6 +148,11 @@ const App = () => {
               options={{headerShown: false, title: 'ChatScreen'}}
               name="ChatScreen"
               component={ChatScreen}
+            />
+              <Stack.Screen
+              options={{headerShown: true, title: 'HealthScoreScreen'}}
+              name="HealthScoreScreen"
+              component={HealthScoreScreen}
             />
           </Stack.Group>
         ) : (

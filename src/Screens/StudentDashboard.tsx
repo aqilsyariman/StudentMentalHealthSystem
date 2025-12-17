@@ -476,7 +476,7 @@ const getScoreColor = (s: number | null | undefined) => {
         {/* Navigation Button */}
         <TouchableOpacity
           style={styles.detailsButton}
-          onPress={() => navigation.navigate('Details')}>
+          onPress={() => navigation.navigate('HealthScoreScreen')}>
           <Text style={styles.detailsButtonText}>View Detailed Analytics</Text>
           <Text style={styles.detailsArrow}>→</Text>
         </TouchableOpacity>
