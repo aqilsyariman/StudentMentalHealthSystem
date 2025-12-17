@@ -10,10 +10,13 @@ import {
   StatusBar,
   Alert,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import AppleHealthKit, {HealthKitPermissions} from 'react-native-health';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {useFocusEffect} from '@react-navigation/native';
 import {getHeightWeightAndBMI} from '../Services/HeightAndWeight';
 import {getHeartRate} from '../Services/HeartRate';
 import {getDailyStepCount} from '../Services/StepDailyCount';
@@ -21,6 +24,7 @@ import {getSleepData} from '../Services/SleepPatterns';
 import {getBloodPressure} from '../Services/BloodPressure';
 import {RootStackParamList} from '../types/navigation';
 import {Image} from 'react-native';
+import {AnimatedCircularProgress} from 'react-native-circular-progress';
 
 const permissions: HealthKitPermissions = {
   permissions: {
@@ -60,17 +64,11 @@ const DashboardScreen = ({navigation}: Props) => {
   const [heartRate, setHeartRateState] = useState<HealthDataWithScore | null>(
     null,
   );
-  // const [sleep, setSleep] = useState<{
-  //   summary: any;
-  //   date: string | null;
-  // } | null>(null);
-
   const [sleep, setSleep] = useState<{
-  summary: any;
-  date: string | null;
-  score?: number | null;
-} | null>(null);
-
+    summary: any;
+    date: string | null;
+    score?: number | null;
+  } | null>(null);
   const [hw, setHW] = useState<{
     height: number | null;
     weight: number | null;
@@ -80,10 +78,85 @@ const DashboardScreen = ({navigation}: Props) => {
   const [bp, setBP] = useState<BloodPressureData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Wellness Score States
+  const [wellnessScore, setWellnessScore] = useState(0);
+  const [hasCompleteData, setHasCompleteData] = useState(false);
+  const [loadingWellness, setLoadingWellness] = useState(true);
+
   const heartRateScore = heartRate?.score;
   const stepCountScore = steps?.score;
   const bpScore = bp?.score;
   const sleepScore = sleep?.score;
+
+  //--------------------------------//
+  const [studentName, setStudentName] = useState<string>('Loading...');
+
+  const fetchStudentName = async (currentStudentId: string) => {
+    if (!currentStudentId) {
+      setStudentName('Guest');
+      return;
+    }
+
+    try {
+      // 🚀 CORRECTED LOGIC: Fetch the document directly using the UID as the Document ID
+      const studentDocument = await firestore()
+        .collection('students')
+        .doc(currentStudentId) // <-- Use .doc() instead of .where()
+        .get();
+
+      console.log('Fetching student name for UID:', currentStudentId);
+
+      if (!studentDocument.exists) {
+        // <-- Check if the document exists
+        console.log(
+          'Error: No student document found for UID:',
+          currentStudentId,
+        );
+        setStudentName('Unknown Student');
+        return;
+      }
+
+      // Access the data
+      const data = studentDocument.data();
+
+      // Make sure 'data' is not undefined before accessing 'fullName'
+      if (data && data.fullName) {
+        // Extract the 'fullName' field.
+        const name = data.fullName;
+
+        // Update the state.
+        setStudentName(name);
+      } else {
+        console.error('Error: Document exists but is missing fullName field.');
+        setStudentName('Name Missing');
+      }
+    } catch (error) {
+      console.error('Error fetching student name: ', error);
+      setStudentName('Error Loading Name');
+    }
+  };
+  // --- useFocusEffect to manage data loading ---
+  useFocusEffect(
+    useCallback(() => {
+      const currentUserId = auth().currentUser?.uid;
+      // You can keep this log for development, but remove it for production
+      console.log('Logged-in User ID:', currentUserId);
+
+      if (currentUserId) {
+        // Run both data fetching functions when the screen is focused
+
+        // Call the corrected function
+        fetchStudentName(currentUserId);
+      } else {
+        setStudentName('Guest');
+      }
+
+      return () => {
+        // Optional cleanup
+      };
+    }, []),
+  );
+  //-------------------------------//
 
   const handleSignOut = () => {
     Alert.alert(
@@ -117,6 +190,50 @@ const DashboardScreen = ({navigation}: Props) => {
       navigation.navigate('StepsGraph', {studentId: currentUserId});
     }
   };
+
+  // Fetch wellness score from Firestore
+  const fetchWellnessScore = useCallback(async () => {
+    const user = auth().currentUser;
+    if (!user) return;
+
+    try {
+      const today = new Date();
+      const dateKey = `${today.getFullYear()}-${String(
+        today.getMonth() + 1,
+      ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const wellnessDoc = await firestore()
+        .collection('students')
+        .doc(user.uid)
+        .collection('wellnessScore')
+        .doc('scores')
+        .get();
+
+      if (wellnessDoc.exists()) {
+        const data = wellnessDoc.data();
+        if (data?.data && data.data[dateKey]) {
+          const todayScore = data.data[dateKey];
+          setWellnessScore(todayScore.finalScore || 0);
+
+          // Check if all scores are available
+          const hasAllScores =
+            todayScore.sleepScore !== null &&
+            todayScore.stepsScore !== null &&
+            todayScore.heartRateScore !== null &&
+            todayScore.bloodPressureScore !== null;
+
+          setHasCompleteData(hasAllScores);
+        } else {
+          setWellnessScore(0);
+          setHasCompleteData(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching wellness score:', error);
+    } finally {
+      setLoadingWellness(false);
+    }
+  }, []);
 
   // Extract health data fetching into a reusable function
   const fetchHealthData = useCallback(() => {
@@ -153,7 +270,8 @@ const DashboardScreen = ({navigation}: Props) => {
   // Pull-to-refresh handler
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    
+    setLoadingWellness(true);
+
     AppleHealthKit.initHealthKit(permissions, err => {
       if (err) {
         console.error('HealthKit not initialized:', err);
@@ -162,13 +280,13 @@ const DashboardScreen = ({navigation}: Props) => {
       }
 
       fetchHealthData();
-      
-      // Give a slight delay for better UX
+      fetchWellnessScore();
+
       setTimeout(() => {
         setRefreshing(false);
       }, 500);
     });
-  }, [fetchHealthData]);
+  }, [fetchHealthData, fetchWellnessScore]);
 
   useEffect(() => {
     if (!isIOS) return;
@@ -181,7 +299,9 @@ const DashboardScreen = ({navigation}: Props) => {
 
       fetchHealthData();
     });
-  }, [isIOS, fetchHealthData]);
+
+    fetchWellnessScore();
+  }, [isIOS, fetchHealthData, fetchWellnessScore]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -225,19 +345,33 @@ const DashboardScreen = ({navigation}: Props) => {
   };
 
   const getSleepQuality = (hours: number) => {
-  if (hours >= 7 && hours <= 9) return { text: 'Excellent', color: '#10B981' };
-  if (hours >= 6 && hours < 7) return { text: 'Good', color: '#3B82F6' };
-  if (hours >= 5 && hours < 6) return { text: 'Fair', color: '#F59E0B' };
-  return { text: 'Poor', color: '#EF4444' };
-};
+    if (hours >= 7 && hours <= 9) return {text: 'Excellent', color: '#10B981'};
+    if (hours >= 6 && hours < 7) return {text: 'Good', color: '#3B82F6'};
+    if (hours >= 5 && hours < 6) return {text: 'Fair', color: '#F59E0B'};
+    return {text: 'Poor', color: '#EF4444'};
+  };
 
-const getScoreColor = (s: number | null | undefined) => {
-  if (s === null || s === undefined) return '#9CA3AF';
-  if (s >= 85) return '#10B981';
-  if (s >= 70) return '#3B82F6';
-  if (s >= 50) return '#F59E0B';
-  return '#EF4444';
-};
+  const getScoreColor = (s: number | null | undefined) => {
+    if (s === null || s === undefined) return '#9CA3AF';
+    if (s >= 85) return '#10B981';
+    if (s >= 70) return '#3B82F6';
+    if (s >= 50) return '#F59E0B';
+    return '#EF4444';
+  };
+
+  const getWellnessScoreColor = (score: number) => {
+    if (score >= 80) return '#10B981';
+    if (score >= 60) return '#F59E0B';
+    if (score >= 40) return '#F97316';
+    return '#EF4444';
+  };
+
+  const getWellnessScoreLabel = (score: number) => {
+    if (score >= 80) return 'Excellent';
+    if (score >= 60) return 'Good';
+    if (score >= 40) return 'Fair';
+    return 'Needs Improvement';
+  };
 
   return (
     <View style={styles.fullContainer}>
@@ -266,7 +400,7 @@ const getScoreColor = (s: number | null | undefined) => {
             }}
           />
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>Hello, Aqil! 👋</Text>
+            <Text style={styles.greeting}>Hello, {studentName}! 👋</Text>
             <Text style={styles.subtitle}>Here's your health overview</Text>
           </View>
           <TouchableOpacity
@@ -280,6 +414,77 @@ const getScoreColor = (s: number | null | undefined) => {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Wellness Score Card */}
+        <TouchableOpacity
+          style={styles.wellnessCard}
+          onPress={() => navigation.navigate('HealthScoreScreen')}
+          activeOpacity={0.7}>
+          <Text style={styles.wellnessTitle}>Today's Wellness Score</Text>
+
+          {loadingWellness ? (
+            <View style={styles.wellnessLoadingContainer}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.wellnessLoadingText}>Calculating...</Text>
+            </View>
+          ) : !hasCompleteData ? (
+            <View style={styles.wellnessIncompleteContainer}>
+              <View style={styles.wellnessIconContainer}>
+                <Text style={styles.wellnessIcon}>⚠️</Text>
+              </View>
+              <View style={styles.wellnessTextContainer}>
+                <Text style={styles.wellnessIncompleteTitle}>
+                  Incomplete Data
+                </Text>
+                <Text style={styles.wellnessIncompleteText}>
+                  Record all health metrics to see your wellness score
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.wellnessScoreContainer}>
+              {/* Add a soft outer shadow container */}
+              <View style={styles.shadowWrapper}>
+                <AnimatedCircularProgress
+                  size={200} // Slightly larger for better impact
+                  width={12} // Thinner stroke looks more modern/elegant
+                  backgroundWidth={8} // Thinner background track creates depth
+                  fill={wellnessScore}
+                  tintColor={getWellnessScoreColor(wellnessScore)}
+                  backgroundColor="rgba(229, 231, 235, 0.5)" // Semi-transparent track
+                  rotation={0}
+                  lineCap="round"
+                  duration={1500} // Smooth entry animation
+                >
+                  {() => (
+                    <View style={styles.wellnessScoreTextInner}>
+                      <Text style={styles.wellnessScoreValue}>
+                        {wellnessScore}
+                      </Text>
+                      <Text style={styles.percentageSign}>%</Text>
+                      <View style={styles.labelBadge}>
+                        <Text
+                          style={[
+                            styles.wellnessScoreLabel,
+                            {color: getWellnessScoreColor(wellnessScore)},
+                          ]}>
+                          {getWellnessScoreLabel(wellnessScore).toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </AnimatedCircularProgress>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.wellnessFooter}>
+            <Text style={styles.wellnessTapText}>
+              Tap for detailed breakdown
+            </Text>
+            <Text style={styles.wellnessArrow}>→</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Full Width Stats Cards */}
         <QuickStatCard
@@ -324,94 +529,106 @@ const getScoreColor = (s: number | null | undefined) => {
         />
 
         <TouchableOpacity
-  style={styles.detailCard}
-  onPress={() => navigation.navigate('ManualSleepTracker')}
-  activeOpacity={0.7}>
-  <View style={styles.cardHeader}>
-    <View style={styles.cardHeaderLeft}>
-      <View
-        style={[
-          styles.cardIconBadge,
-          {backgroundColor: '#6366F1' + '15'},
-        ]}>
-        <Text style={styles.cardIcon}>
-          <Image
-            source={require('../Assets/moon.png')}
-            style={{width: 30, height: 30, marginBottom: -5}}
-            resizeMode="contain"
-          />
-        </Text>
-      </View>
-      <Text style={[styles.cardTitle, {color: '#722fdeff'}]}>
-        Sleep Analysis
-      </Text>
-    </View>
-    <View style={styles.sleepHeaderRight}>
-      {sleepScore !== null && sleepScore !== undefined && (
-        <View
-          style={[
-            styles.scoreChip,
-            {backgroundColor: getScoreColor(sleepScore) + '15'},
-          ]}>
-          <Text style={[styles.scoreChipText, {color: getScoreColor(sleepScore)}]}>
-            {sleepScore}
-          </Text>
-        </View>
-      )}
-      <Text style={styles.tapToLogText}>Tap to Log</Text>
-    </View>
-  </View>
-  <View style={styles.cardContent}>
-    {sleep?.summary ? (
-      <View>
-        <View style={styles.sleepSummary}>
-          <Text style={styles.sleepDurationLabel}>
-            Last Sleep Duration
-          </Text>
-          <Text style={styles.sleepDurationValue}>
-            {sleep.summary.duration} hours
-          </Text>
-          {sleep.summary.duration && (
-            <View
-              style={[
-                styles.qualityBadge,
-                {
-                  backgroundColor:
-                    getSleepQuality(parseFloat(sleep.summary.duration)).color + '20',
-                },
-              ]}>
-              <Text
+          style={styles.detailCard}
+          onPress={() => navigation.navigate('ManualSleepTracker')}
+          activeOpacity={0.7}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <View
                 style={[
-                  styles.qualityText,
-                  {color: getSleepQuality(parseFloat(sleep.summary.duration)).color},
+                  styles.cardIconBadge,
+                  {backgroundColor: '#6366F1' + '15'},
                 ]}>
-                {getSleepQuality(parseFloat(sleep.summary.duration)).text}
+                <Text style={styles.cardIcon}>
+                  <Image
+                    source={require('../Assets/moon.png')}
+                    style={{width: 30, height: 30, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
+              </View>
+              <Text style={[styles.cardTitle, {color: '#722fdeff'}]}>
+                Sleep Analysis
               </Text>
             </View>
-          )}
-        </View>
-        <View style={styles.sleepTimes}>
-          <View style={styles.sleepTimeItem}>
-            <Text style={styles.sleepTimeLabel}>🌙 Bed Time</Text>
-            <Text style={styles.sleepTimeValue}>
-              {sleep.summary.bedTime}
-            </Text>
+            <View style={styles.sleepHeaderRight}>
+              {sleepScore !== null && sleepScore !== undefined && (
+                <View
+                  style={[
+                    styles.scoreChip,
+                    {backgroundColor: getScoreColor(sleepScore) + '15'},
+                  ]}>
+                  <Text
+                    style={[
+                      styles.scoreChipText,
+                      {color: getScoreColor(sleepScore)},
+                    ]}>
+                    {sleepScore}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.tapToLogText}>Tap to Log</Text>
+            </View>
           </View>
-          <View style={styles.sleepTimeItem}>
-            <Text style={styles.sleepTimeLabel}>☀️ Wake Time</Text>
-            <Text style={styles.sleepTimeValue}>
-              {sleep.summary.wakeTime}
-            </Text>
+          <View style={styles.cardContent}>
+            {sleep?.summary ? (
+              <View>
+                <View style={styles.sleepSummary}>
+                  <Text style={styles.sleepDurationLabel}>
+                    Last Sleep Duration
+                  </Text>
+                  <Text style={styles.sleepDurationValue}>
+                    {sleep.summary.duration} hours
+                  </Text>
+                  {sleep.summary.duration && (
+                    <View
+                      style={[
+                        styles.qualityBadge,
+                        {
+                          backgroundColor:
+                            getSleepQuality(parseFloat(sleep.summary.duration))
+                              .color + '20',
+                        },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.qualityText,
+                          {
+                            color: getSleepQuality(
+                              parseFloat(sleep.summary.duration),
+                            ).color,
+                          },
+                        ]}>
+                        {
+                          getSleepQuality(parseFloat(sleep.summary.duration))
+                            .text
+                        }
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.sleepTimes}>
+                  <View style={styles.sleepTimeItem}>
+                    <Text style={styles.sleepTimeLabel}>🌙 Bed Time</Text>
+                    <Text style={styles.sleepTimeValue}>
+                      {sleep.summary.bedTime}
+                    </Text>
+                  </View>
+                  <View style={styles.sleepTimeItem}>
+                    <Text style={styles.sleepTimeLabel}>☀️ Wake Time</Text>
+                    <Text style={styles.sleepTimeValue}>
+                      {sleep.summary.wakeTime}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.noData}>
+                No sleep data logged yet. Tap to start tracking!
+              </Text>
+            )}
           </View>
-        </View>
-      </View>
-    ) : (
-      <Text style={styles.noData}>
-        No sleep data logged yet. Tap to start tracking!
-      </Text>
-    )}
-  </View>
-</TouchableOpacity>
+        </TouchableOpacity>
 
         {/* Main Health Cards */}
         <DetailCard
@@ -497,7 +714,7 @@ const getScoreColor = (s: number | null | undefined) => {
   );
 };
 
-// Component definitions remain the same...
+// Component definitions...
 const QuickStatCard = ({
   title,
   value,
@@ -663,7 +880,7 @@ const MetricItem = ({
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: '#ece3f6ff',
+    backgroundColor: '#F5F3FF',
   },
   scrollContainer: {
     padding: 20,
@@ -709,6 +926,93 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  // Wellness Score Styles
+  wellnessCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 20,
+    shadowColor: '#8B5CF6',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 2,
+    borderColor: '#E9D5FF',
+  },
+  wellnessTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 20,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  wellnessLoadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  wellnessLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  wellnessIncompleteContainer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  wellnessIconContainer: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  wellnessIcon: {
+    fontSize: 24,
+  },
+  wellnessTextContainer: {
+    flex: 1,
+  },
+  wellnessIncompleteTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  wellnessIncompleteText: {
+    fontSize: 13,
+    color: '#78350F',
+    lineHeight: 18,
+  },
+
+  wellnessScoreTextContainer: {
+    alignItems: 'center',
+  },
+
+  wellnessFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  wellnessTapText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+    marginRight: 6,
+  },
+  wellnessArrow: {
+    fontSize: 16,
+    color: '#8B5CF6',
+    fontWeight: '700',
   },
   logoutButton: {
     backgroundColor: '#FFFFFF',
@@ -1059,21 +1363,76 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   sleepHeaderRight: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-},
-qualityBadge: {
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 12,
-  marginTop: 8,
-},
-qualityText: {
-  fontSize: 12,
-  fontWeight: '700',
-  textTransform: 'uppercase',
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  qualityBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  qualityText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  wellnessScoreContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  // Creates a soft glow/float effect around the circle
+  shadowWrapper: {
+    borderRadius: 100,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 10},
+        shadowOpacity: 0.1,
+        shadowRadius: 15,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  wellnessScoreTextInner: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The big number
+  wellnessScoreValue: {
+    fontSize: 42,
+    fontWeight: '800', // Extra bold for impact
+    color: '#111827', // Slate 900
+    letterSpacing: -1,
+  },
+  // Separate % sign styling for better typography hierarchy
+  percentageSign: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6B7280', // Muted gray
+    position: 'absolute',
+    right: -15,
+    top: 10,
+  },
+  // The status label (e.g., "EXCELLENT")
+  labelBadge: {
+    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: '#F3F4F6', // Light gray background pill
+    borderRadius: 20,
+  },
+  wellnessScoreLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
 });
 
 export default DashboardScreen;

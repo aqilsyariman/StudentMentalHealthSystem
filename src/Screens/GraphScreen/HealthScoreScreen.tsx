@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import {Image} from 'react-native';
+
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import { AnimatedCircularProgress } from 'react-native-circular-progress';
+import {AnimatedCircularProgress} from 'react-native-circular-progress';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface MetricScore {
@@ -31,28 +33,20 @@ const HealthScoreScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [healthScores, setHealthScores] = useState<HealthScores>({
-    sleep: { value: null, score: null, date: null },
-    steps: { value: null, score: null, date: null },
-    heartRate: { value: null, score: null, date: null },
-    bloodPressure: { value: null, score: null, date: null },
+    sleep: {value: null, score: null, date: null},
+    steps: {value: null, score: null, date: null},
+    heartRate: {value: null, score: null, date: null},
+    bloodPressure: {value: null, score: null, date: null},
   });
   const [finalScore, setFinalScore] = useState(0);
   const [targetDate, setTargetDate] = useState<string>('');
   const [hasCompleteData, setHasCompleteData] = useState(false);
   const [missingMetrics, setMissingMetrics] = useState<string[]>([]);
-  
+
   // Date picker states
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isToday, setIsToday] = useState(true);
-
-  // const getTodayDateKey = () => {
-  //   const now = new Date();
-  //   const year = now.getFullYear();
-  //   const month = String(now.getMonth() + 1).padStart(2, '0');
-  //   const day = String(now.getDate()).padStart(2, '0');
-  //   return `${year}-${month}-${day}`;
-  // };
 
   const getDateKeyFromDate = (date: Date) => {
     const year = date.getFullYear();
@@ -70,242 +64,267 @@ const HealthScoreScreen = () => {
     );
   };
 
-  const fetchAllHealthData = useCallback(async (dateToFetch?: Date) => {
-    const user = auth().currentUser;
-    if (!user) {
-      console.warn('User not authenticated');
-      setLoading(false);
-      return;
-    }
+  const fetchAllHealthData = useCallback(
+    async (dateToFetch?: Date) => {
+      const user = auth().currentUser;
+      if (!user) {
+        console.warn('User not authenticated');
+        setLoading(false);
+        return;
+      }
 
-    const targetDateObj = dateToFetch || selectedDate;
-    const dateKey = getDateKeyFromDate(targetDateObj);
-    setTargetDate(dateKey);
-    setIsToday(checkIsToday(targetDateObj));
+      const targetDateObj = dateToFetch || selectedDate;
+      const dateKey = getDateKeyFromDate(targetDateObj);
+      setTargetDate(dateKey);
+      setIsToday(checkIsToday(targetDateObj));
 
-    // Define all fetch functions inside useCallback
-    const fetchSleepScore = async (uid: string, dateKey: string): Promise<MetricScore> => {
-      try {
-        const sleepDoc = await firestore()
-          .collection('students')
-          .doc(uid)
-          .collection('sensorData')
-          .doc('sleep')
-          .get();
+      const fetchSleepScore = async (
+        uid: string,
+        dateKey: string,
+      ): Promise<MetricScore> => {
+        try {
+          const sleepDoc = await firestore()
+            .collection('students')
+            .doc(uid)
+            .collection('sensorData')
+            .doc('sleep')
+            .get();
 
-        if (sleepDoc.exists()) {
-          const data = sleepDoc.data();
-          if (data?.latestSleep) {
-            const latest = data.latestSleep;
-            const sleepDate = latest.timestamp.toDate();
-            const actualDateKey = getDateKeyFromDate(sleepDate);
-            
-            if (actualDateKey === dateKey) {
+          if (sleepDoc.exists()) {
+            const data = sleepDoc.data();
+            if (data?.latestSleep) {
+              const latest = data.latestSleep;
+              const sleepDate = latest.timestamp.toDate();
+              const actualDateKey = getDateKeyFromDate(sleepDate);
+
+              if (actualDateKey === dateKey) {
+                return {
+                  value: parseFloat(latest.duration.toFixed(1)),
+                  score: latest.score || 0,
+                  date: latest.timestamp.toDate().toISOString(),
+                };
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching sleep score:', error);
+        }
+        return {value: null, score: null, date: null};
+      };
+
+      const fetchStepsScore = async (
+        uid: string,
+        dateKey: string,
+      ): Promise<MetricScore> => {
+        try {
+          const stepsDoc = await firestore()
+            .collection('students')
+            .doc(uid)
+            .collection('sensorData')
+            .doc('stepCount')
+            .get();
+
+          if (stepsDoc.exists()) {
+            const data = stepsDoc.data();
+            if (data?.data && data.data[dateKey]) {
+              const latestReading = data.data[dateKey][0];
               return {
-                value: parseFloat(latest.duration.toFixed(1)),
-                score: latest.score || 0,
-                date: latest.timestamp.toDate().toISOString(),
+                value: latestReading.value,
+                score: latestReading.score || 0,
+                date: latestReading.timestamp.toDate().toISOString(),
               };
             }
           }
+        } catch (error) {
+          console.error('Error fetching steps score:', error);
         }
-      } catch (error) {
-        console.error('Error fetching sleep score:', error);
-      }
-      return { value: null, score: null, date: null };
-    };
-
-    const fetchStepsScore = async (uid: string, dateKey: string): Promise<MetricScore> => {
-      try {
-        const stepsDoc = await firestore()
-          .collection('students')
-          .doc(uid)
-          .collection('sensorData')
-          .doc('stepCount')
-          .get();
-
-        if (stepsDoc.exists()) {
-          const data = stepsDoc.data();
-          if (data?.data && data.data[dateKey]) {
-            const latestReading = data.data[dateKey][0];
-            return {
-              value: latestReading.value,
-              score: latestReading.score || 0,
-              date: latestReading.timestamp.toDate().toISOString(),
-            };
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching steps score:', error);
-      }
-      return { value: null, score: null, date: null };
-    };
-
-    const fetchHeartRateScore = async (uid: string, dateKey: string): Promise<MetricScore> => {
-      try {
-        const hrDoc = await firestore()
-          .collection('students')
-          .doc(uid)
-          .collection('sensorData')
-          .doc('heartRate')
-          .get();
-
-        if (hrDoc.exists()) {
-          const data = hrDoc.data();
-          if (data?.data && data.data[dateKey]) {
-            const readings = data.data[dateKey];
-            const latestReading = readings[readings.length - 1];
-            return {
-              value: latestReading.value,
-              score: latestReading.score || 0,
-              date: latestReading.timestamp.toDate().toISOString(),
-            };
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching heart rate score:', error);
-      }
-      return { value: null, score: null, date: null };
-    };
-
-    const fetchBloodPressureScore = async (uid: string, dateKey: string): Promise<MetricScore> => {
-      try {
-        const bpDoc = await firestore()
-          .collection('students')
-          .doc(uid)
-          .collection('sensorData')
-          .doc('bloodPressure')
-          .get();
-
-        if (bpDoc.exists()) {
-          const data = bpDoc.data();
-          if (data?.data && data.data[dateKey]) {
-            const readings = data.data[dateKey];
-            const latestReading = readings[readings.length - 1];
-            return {
-              value: latestReading.sys,
-              score: latestReading.score || 0,
-              date: latestReading.timestamp.toDate().toISOString(),
-            };
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching blood pressure score:', error);
-      }
-      return { value: null, score: null, date: null };
-    };
-
-    const calculateScore = (
-      sleep: MetricScore,
-      steps: MetricScore,
-      hr: MetricScore,
-      bp: MetricScore
-    ) => {
-      const weights = {
-        sleep: 0.40,
-        steps: 0.30,
-        heartRate: 0.20,
-        bloodPressure: 0.10,
+        return {value: null, score: null, date: null};
       };
 
-      let weightedSum = 0;
+      const fetchHeartRateScore = async (
+        uid: string,
+        dateKey: string,
+      ): Promise<MetricScore> => {
+        try {
+          const hrDoc = await firestore()
+            .collection('students')
+            .doc(uid)
+            .collection('sensorData')
+            .doc('heartRate')
+            .get();
 
-      if (sleep.score !== null && steps.score !== null && hr.score !== null && bp.score !== null) {
-        weightedSum = 
-          (sleep.score * weights.sleep) +
-          (steps.score * weights.steps) +
-          (hr.score * weights.heartRate) +
-          (bp.score * weights.bloodPressure);
-      }
+          if (hrDoc.exists()) {
+            const data = hrDoc.data();
+            if (data?.data && data.data[dateKey]) {
+              const readings = data.data[dateKey];
+              const latestReading = readings[readings.length - 1];
+              return {
+                value: latestReading.value,
+                score: latestReading.score || 0,
+                date: latestReading.timestamp.toDate().toISOString(),
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching heart rate score:', error);
+        }
+        return {value: null, score: null, date: null};
+      };
 
-      return Math.round(weightedSum);
-    };
+      const fetchBloodPressureScore = async (
+        uid: string,
+        dateKey: string,
+      ): Promise<MetricScore> => {
+        try {
+          const bpDoc = await firestore()
+            .collection('students')
+            .doc(uid)
+            .collection('sensorData')
+            .doc('bloodPressure')
+            .get();
 
-    const saveWellnessScore = async (
-      uid: string,
-      dateKey: string,
-      sleep: MetricScore,
-      steps: MetricScore,
-      hr: MetricScore,
-      bp: MetricScore,
-      finalScore: number
-    ) => {
-      try {
-        const wellnessDocRef = firestore()
-          .collection('students')
-          .doc(uid)
-          .collection('wellnessScore')
-          .doc('scores');
+          if (bpDoc.exists()) {
+            const data = bpDoc.data();
+            if (data?.data && data.data[dateKey]) {
+              const readings = data.data[dateKey];
+              const latestReading = readings[readings.length - 1];
+              return {
+                value: latestReading.sys,
+                score: latestReading.score || 0,
+                date: latestReading.timestamp.toDate().toISOString(),
+              };
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching blood pressure score:', error);
+        }
+        return {value: null, score: null, date: null};
+      };
 
-        const scoreData = {
-          sleepScore: sleep.score,
-          stepsScore: steps.score,
-          heartRateScore: hr.score,
-          bloodPressureScore: bp.score,
-          finalScore: finalScore,
-          timestamp: firestore.Timestamp.now(),
+      const calculateScore = (
+        sleep: MetricScore,
+        steps: MetricScore,
+        hr: MetricScore,
+        bp: MetricScore,
+      ) => {
+        const weights = {
+          sleep: 0.4,
+          steps: 0.3,
+          heartRate: 0.2,
+          bloodPressure: 0.1,
         };
 
-        await wellnessDocRef.set(
-          {
-            data: {
-              [dateKey]: scoreData,
-            },
-          },
-          { merge: true }
-        );
+        let weightedSum = 0;
 
-        console.log(`✅ Saved wellness score (${finalScore}) for ${dateKey}`);
-      } catch (error) {
-        console.error('❌ Failed to save wellness score:', error);
-      }
-    };
-
-    try {
-      // Fetch all metrics in parallel
-      const [sleepData, stepsData, hrData, bpData] = await Promise.all([
-        fetchSleepScore(user.uid, dateKey),
-        fetchStepsScore(user.uid, dateKey),
-        fetchHeartRateScore(user.uid, dateKey),
-        fetchBloodPressureScore(user.uid, dateKey),
-      ]);
-
-      setHealthScores({
-        sleep: sleepData,
-        steps: stepsData,
-        heartRate: hrData,
-        bloodPressure: bpData,
-      });
-
-      // Check which metrics are missing
-      const missing: string[] = [];
-      if (!sleepData.score && sleepData.score !== 0) missing.push('Sleep Duration');
-      if (!stepsData.score && stepsData.score !== 0) missing.push('Daily Steps');
-      if (!hrData.score && hrData.score !== 0) missing.push('Heart Rate');
-      if (!bpData.score && bpData.score !== 0) missing.push('Blood Pressure');
-
-      setMissingMetrics(missing);
-      setHasCompleteData(missing.length === 0);
-
-      // Only calculate final score if all metrics are available
-      if (missing.length === 0) {
-        const final = calculateScore(sleepData, stepsData, hrData, bpData);
-        setFinalScore(final);
-        
-        // Only save to Firestore if viewing today's date
-        if (checkIsToday(targetDateObj)) {
-          await saveWellnessScore(user.uid, dateKey, sleepData, stepsData, hrData, bpData, final);
+        if (
+          sleep.score !== null &&
+          steps.score !== null &&
+          hr.score !== null &&
+          bp.score !== null
+        ) {
+          weightedSum =
+            sleep.score * weights.sleep +
+            steps.score * weights.steps +
+            hr.score * weights.heartRate +
+            bp.score * weights.bloodPressure;
         }
-      } else {
-        setFinalScore(0);
+
+        return Math.round(weightedSum);
+      };
+
+      const saveWellnessScore = async (
+        uid: string,
+        dateKey: string,
+        sleep: MetricScore,
+        steps: MetricScore,
+        hr: MetricScore,
+        bp: MetricScore,
+        finalScore: number,
+      ) => {
+        try {
+          const wellnessDocRef = firestore()
+            .collection('students')
+            .doc(uid)
+            .collection('wellnessScore')
+            .doc('scores');
+
+          const scoreData = {
+            sleepScore: sleep.score,
+            stepsScore: steps.score,
+            heartRateScore: hr.score,
+            bloodPressureScore: bp.score,
+            finalScore: finalScore,
+            timestamp: firestore.Timestamp.now(),
+          };
+
+          await wellnessDocRef.set(
+            {
+              data: {
+                [dateKey]: scoreData,
+              },
+            },
+            {merge: true},
+          );
+
+          console.log(`✅ Saved wellness score (${finalScore}) for ${dateKey}`);
+        } catch (error) {
+          console.error('❌ Failed to save wellness score:', error);
+        }
+      };
+
+      try {
+        const [sleepData, stepsData, hrData, bpData] = await Promise.all([
+          fetchSleepScore(user.uid, dateKey),
+          fetchStepsScore(user.uid, dateKey),
+          fetchHeartRateScore(user.uid, dateKey),
+          fetchBloodPressureScore(user.uid, dateKey),
+        ]);
+
+        setHealthScores({
+          sleep: sleepData,
+          steps: stepsData,
+          heartRate: hrData,
+          bloodPressure: bpData,
+        });
+
+        const missing: string[] = [];
+        if (!sleepData.score && sleepData.score !== 0)
+          missing.push('Sleep Duration');
+        if (!stepsData.score && stepsData.score !== 0)
+          missing.push('Daily Steps');
+        if (!hrData.score && hrData.score !== 0) missing.push('Heart Rate');
+        if (!bpData.score && bpData.score !== 0) missing.push('Blood Pressure');
+
+        setMissingMetrics(missing);
+        setHasCompleteData(missing.length === 0);
+
+        if (missing.length === 0) {
+          const final = calculateScore(sleepData, stepsData, hrData, bpData);
+          setFinalScore(final);
+
+          if (checkIsToday(targetDateObj)) {
+            await saveWellnessScore(
+              user.uid,
+              dateKey,
+              sleepData,
+              stepsData,
+              hrData,
+              bpData,
+              final,
+            );
+          }
+        } else {
+          setFinalScore(0);
+        }
+      } catch (error) {
+        console.error('Error fetching health data:', error);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error fetching health data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [selectedDate]);
+    },
+    [selectedDate],
+  );
 
   useEffect(() => {
     fetchAllHealthData();
@@ -318,7 +337,7 @@ const HealthScoreScreen = () => {
 
   const onDateChange = (event: any, date?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
-    
+
     if (date) {
       setSelectedDate(date);
       setLoading(true);
@@ -342,10 +361,10 @@ const HealthScoreScreen = () => {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return '#4CAF50';
-    if (score >= 60) return '#FFC107';
-    if (score >= 40) return '#FF9800';
-    return '#F44336';
+    if (score >= 80) return '#10B981';
+    if (score >= 60) return '#F59E0B';
+    if (score >= 40) return '#F97316';
+    return '#EF4444';
   };
 
   const getScoreLabel = (score: number) => {
@@ -378,7 +397,7 @@ const HealthScoreScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200EE" />
+        <ActivityIndicator size="large" color="#6366F1" />
         <Text style={styles.loadingText}>Loading health data...</Text>
       </View>
     );
@@ -388,39 +407,44 @@ const HealthScoreScreen = () => {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={['#6366F1']}
+        />
+      }>
       {/* Date Selector */}
       <View style={styles.datePickerContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.dateNavButton}
-          onPress={() => navigateDate(-1)}
-        >
-          <Text style={styles.dateNavButtonText}>◀</Text>
+          onPress={() => navigateDate(-1)}>
+          <Text style={styles.dateNavButtonText}>←</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.dateDisplayButton}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text style={styles.dateDisplayText}>📅 {formatDisplayDate(selectedDate)}</Text>
+          onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.dateDisplayText}>
+            {formatDisplayDate(selectedDate)}
+          </Text>
           {!isToday && (
-            <TouchableOpacity 
-              style={styles.todayBadge}
-              onPress={goToToday}
-            >
+            <TouchableOpacity style={styles.todayBadge} onPress={goToToday}>
               <Text style={styles.todayBadgeText}>Today</Text>
             </TouchableOpacity>
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.dateNavButton, !isToday && styles.dateNavButtonActive]}
           onPress={() => navigateDate(1)}
-          disabled={isToday}
-        >
-          <Text style={[styles.dateNavButtonText, isToday && styles.dateNavButtonTextDisabled]}>▶</Text>
+          disabled={isToday}>
+          <Text
+            style={[
+              styles.dateNavButtonText,
+              isToday && styles.dateNavButtonTextDisabled,
+            ]}>
+            →
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -437,37 +461,50 @@ const HealthScoreScreen = () => {
       {/* Overall Score Section */}
       <View style={styles.overallScoreContainer}>
         <Text style={styles.headerTitle}>Wellness Score</Text>
-        <Text style={styles.dateText}>Date: {targetDate}</Text>
-        
+        <Text style={styles.dateText}>{targetDate}</Text>
+
         {!hasCompleteData ? (
           <View style={styles.warningContainer}>
-            <Text style={styles.warningIcon}>⚠️</Text>
+            <View style={styles.warningIconContainer}>
+              <Text style={styles.warningIcon}>⚠️</Text>
+            </View>
             <View style={styles.warningTextContainer}>
               <Text style={styles.warningTitle}>Incomplete Data</Text>
               <Text style={styles.warningText}>
-                {isToday 
-                  ? 'Please update the following metrics to calculate your daily score:'
-                  : 'The following metrics were not recorded on this date:'}
+                {isToday
+                  ? 'Please update these metrics to calculate your daily score:'
+                  : 'These metrics were not recorded on this date:'}
               </Text>
               {missingMetrics.map((metric, index) => (
-                <Text key={index} style={styles.warningMetric}>• {metric}</Text>
+                <View key={index} style={styles.missingMetricRow}>
+                  <View style={styles.bulletPoint} />
+                  <Text style={styles.warningMetric}>{metric}</Text>
+                </View>
               ))}
             </View>
           </View>
         ) : (
           <View style={styles.circularProgressContainer}>
             <AnimatedCircularProgress
-              size={200}
-              width={20}
+              size={220}
+              width={18}
               fill={finalScore}
               tintColor={getScoreColor(finalScore)}
-              backgroundColor="#E0E0E0"
+              backgroundColor="#E5E7EB"
               rotation={0}
-            >
+              lineCap="round">
               {() => (
                 <View style={styles.scoreTextContainer}>
                   <Text style={styles.scoreValue}>{finalScore}</Text>
-                  <Text style={styles.scoreLabel}>{getScoreLabel(finalScore)}</Text>
+                  <View style={styles.scoreLabelContainer}>
+                    <Text
+                      style={[
+                        styles.scoreLabel,
+                        {color: getScoreColor(finalScore)},
+                      ]}>
+                      {getScoreLabel(finalScore)}
+                    </Text>
+                  </View>
                 </View>
               )}
             </AnimatedCircularProgress>
@@ -480,139 +517,307 @@ const HealthScoreScreen = () => {
         <Text style={styles.sectionTitle}>Health Metrics</Text>
 
         {/* Sleep Score - 40% */}
-        <View style={[
-          styles.metricCard,
-          (!healthScores.sleep.score && healthScores.sleep.score !== 0) && styles.metricCardMissing
-        ]}>
+        <View
+          style={[
+            styles.metricCard,
+            !healthScores.sleep.score &&
+              healthScores.sleep.score !== 0 &&
+              styles.metricCardMissing,
+            {backgroundColor: '#efe5f7ff'}
+          ]}>
           <View style={styles.metricHeader}>
             <View style={styles.metricTitleRow}>
-              <Text style={styles.metricIcon}>😴</Text>
-              <View>
+              <View style={[styles.iconContainer]}>
+                <Text style={styles.metricIcon}>
+                  <Image
+                    source={require('../../Assets/moon.png')}
+                    style={{width: 30, height: 30, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
+              </View>
+              <View style={styles.metricTitleContainer}>
                 <Text style={styles.metricTitle}>Sleep Duration</Text>
-                <Text style={styles.metricWeight}>Weight: 40%</Text>
+                <View style={styles.weightBadge}>
+                  <Text style={styles.metricWeight}>40% Weight</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.metricScoreContainer}>
-              <Text style={[
-                styles.metricScore, 
-                { color: healthScores.sleep.score ? getScoreColor(healthScores.sleep.score) : '#999' }
+            <View
+              style={[
+                styles.metricScoreContainer,
+                healthScores.sleep.score !== null &&
+                  healthScores.sleep.score !== undefined && {
+                    backgroundColor: `${getScoreColor(
+                      healthScores.sleep.score,
+                    )}15`,
+                  },
               ]}>
+              <Text
+                style={[
+                  styles.metricScore,
+                  {
+                    color:
+                      healthScores.sleep.score !== null &&
+                      healthScores.sleep.score !== undefined
+                        ? getScoreColor(healthScores.sleep.score)
+                        : '#9CA3AF',
+                  },
+                ]}>
                 {healthScores.sleep.score ?? '--'}
               </Text>
             </View>
           </View>
           <Text style={styles.metricValue}>
-            {healthScores.sleep.value ? `${healthScores.sleep.value} hours` : 'No data for this date'}
+            {healthScores.sleep.value
+              ? `${healthScores.sleep.value} hours`
+              : 'No data for this date'}
           </Text>
           <Text style={styles.metricDate}>
-            {healthScores.sleep.date ? formatDate(healthScores.sleep.date) : 'Not recorded'}
+            {healthScores.sleep.date
+              ? formatDate(healthScores.sleep.date)
+              : 'Not recorded'}
           </Text>
         </View>
 
         {/* Steps Score - 30% */}
-        <View style={[
-          styles.metricCard,
-          (!healthScores.steps.score && healthScores.steps.score !== 0) && styles.metricCardMissing
-        ]}>
+        <View
+          style={[
+            styles.metricCard,
+            !healthScores.steps.score &&
+              healthScores.steps.score !== 0 &&
+              styles.metricCardMissing,
+                          {backgroundColor: '#fbe6d6ff'}
+
+          ]}>
           <View style={styles.metricHeader}>
             <View style={styles.metricTitleRow}>
-              <Text style={styles.metricIcon}>👟</Text>
-              <View>
+              <View style={[styles.iconContainer]}>
+                <Text style={styles.metricIcon}>
+                  <Image
+                    source={require('../../Assets/burn.png')}
+                    style={{width: 30, height: 30, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
+              </View>
+              <View style={styles.metricTitleContainer}>
                 <Text style={styles.metricTitle}>Daily Steps</Text>
-                <Text style={styles.metricWeight}>Weight: 30%</Text>
+                <View style={styles.weightBadge}>
+                  <Text style={styles.metricWeight}>30% Weight</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.metricScoreContainer}>
-              <Text style={[
-                styles.metricScore, 
-                { color: healthScores.steps.score ? getScoreColor(healthScores.steps.score) : '#999' }
+            <View
+              style={[
+                styles.metricScoreContainer,
+                healthScores.steps.score !== null &&
+                  healthScores.steps.score !== undefined && {
+                    backgroundColor: `${getScoreColor(
+                      healthScores.steps.score,
+                    )}15`,
+                  },
               ]}>
+              <Text
+                style={[
+                  styles.metricScore,
+                  {
+                    color:
+                      healthScores.steps.score !== null &&
+                      healthScores.steps.score !== undefined
+                        ? getScoreColor(healthScores.steps.score)
+                        : '#9CA3AF',
+                  },
+                ]}>
                 {healthScores.steps.score ?? '--'}
               </Text>
             </View>
           </View>
           <Text style={styles.metricValue}>
-            {healthScores.steps.value ? `${healthScores.steps.value.toLocaleString()} steps` : 'No data for this date'}
+            {healthScores.steps.value
+              ? `${healthScores.steps.value.toLocaleString()} steps`
+              : 'No data for this date'}
           </Text>
           <Text style={styles.metricDate}>
-            {healthScores.steps.date ? formatDate(healthScores.steps.date) : 'Not recorded'}
+            {healthScores.steps.date
+              ? formatDate(healthScores.steps.date)
+              : 'Not recorded'}
           </Text>
         </View>
 
         {/* Heart Rate Score - 20% */}
-        <View style={[
-          styles.metricCard,
-          (!healthScores.heartRate.score && healthScores.heartRate.score !== 0) && styles.metricCardMissing
-        ]}>
+        <View
+          style={[
+            styles.metricCard,
+            !healthScores.heartRate.score &&
+              healthScores.heartRate.score !== 0 &&
+              styles.metricCardMissing,
+                          {backgroundColor: '#fad6d4ff'}
+
+          ]}>
           <View style={styles.metricHeader}>
             <View style={styles.metricTitleRow}>
-              <Text style={styles.metricIcon}>❤️</Text>
-              <View>
+              <View style={[styles.iconContainer]}>
+                <Text style={styles.metricIcon}>
+                  <Image
+                    source={require('../../Assets/heart-rate.png')}
+                    style={{width: 30, height: 30, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
+              </View>
+              <View style={styles.metricTitleContainer}>
                 <Text style={styles.metricTitle}>Resting Heart Rate</Text>
-                <Text style={styles.metricWeight}>Weight: 20%</Text>
+                <View style={styles.weightBadge}>
+                  <Text style={styles.metricWeight}>20% Weight</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.metricScoreContainer}>
-              <Text style={[
-                styles.metricScore, 
-                { color: healthScores.heartRate.score ? getScoreColor(healthScores.heartRate.score) : '#999' }
+            <View
+              style={[
+                styles.metricScoreContainer,
+                healthScores.heartRate.score !== null &&
+                  healthScores.heartRate.score !== undefined && {
+                    backgroundColor: `${getScoreColor(
+                      healthScores.heartRate.score,
+                    )}15`,
+                  },
               ]}>
+              <Text
+                style={[
+                  styles.metricScore,
+                  {
+                    color:
+                      healthScores.heartRate.score !== null &&
+                      healthScores.heartRate.score !== undefined
+                        ? getScoreColor(healthScores.heartRate.score)
+                        : '#9CA3AF',
+                  },
+                ]}>
                 {healthScores.heartRate.score ?? '--'}
               </Text>
             </View>
           </View>
           <Text style={styles.metricValue}>
-            {healthScores.heartRate.value ? `${healthScores.heartRate.value} bpm` : 'No data for this date'}
+            {healthScores.heartRate.value
+              ? `${healthScores.heartRate.value} bpm`
+              : 'No data for this date'}
           </Text>
           <Text style={styles.metricDate}>
-            {healthScores.heartRate.date ? formatDate(healthScores.heartRate.date) : 'Not recorded'}
+            {healthScores.heartRate.date
+              ? formatDate(healthScores.heartRate.date)
+              : 'Not recorded'}
           </Text>
         </View>
 
         {/* Blood Pressure Score - 10% */}
-        <View style={[
-          styles.metricCard,
-          (!healthScores.bloodPressure.score && healthScores.bloodPressure.score !== 0) && styles.metricCardMissing
-        ]}>
+        <View
+          style={[
+            styles.metricCard,
+            !healthScores.bloodPressure.score &&
+              healthScores.bloodPressure.score !== 0 &&
+              styles.metricCardMissing,
+                          {backgroundColor: '#f7bdbdff'}
+
+          ]}>
           <View style={styles.metricHeader}>
             <View style={styles.metricTitleRow}>
-              <Text style={styles.metricIcon}>🩺</Text>
-              <View>
+              <View style={[styles.iconContainer]}>
+                <Text style={styles.metricIcon}>
+                  <Image
+                    source={require('../../Assets/blood-pressure.png')}
+                    style={{width: 40, height: 40, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
+              </View>
+              <View style={styles.metricTitleContainer}>
                 <Text style={styles.metricTitle}>Blood Pressure</Text>
-                <Text style={styles.metricWeight}>Weight: 10%</Text>
+                <View style={styles.weightBadge}>
+                  <Text style={styles.metricWeight}>10% Weight</Text>
+                </View>
               </View>
             </View>
-            <View style={styles.metricScoreContainer}>
-              <Text style={[
-                styles.metricScore, 
-                { color: healthScores.bloodPressure.score ? getScoreColor(healthScores.bloodPressure.score) : '#999' }
+            <View
+              style={[
+                styles.metricScoreContainer,
+                healthScores.bloodPressure.score !== null &&
+                  healthScores.bloodPressure.score !== undefined && {
+                    backgroundColor: `${getScoreColor(
+                      healthScores.bloodPressure.score,
+                    )}15`,
+                  },
               ]}>
+              <Text
+                style={[
+                  styles.metricScore,
+                  {
+                    color:
+                      healthScores.bloodPressure.score !== null &&
+                      healthScores.bloodPressure.score !== undefined
+                        ? getScoreColor(healthScores.bloodPressure.score)
+                        : '#9CA3AF',
+                  },
+                ]}>
                 {healthScores.bloodPressure.score ?? '--'}
               </Text>
             </View>
           </View>
           <Text style={styles.metricValue}>
-            {healthScores.bloodPressure.value ? `${healthScores.bloodPressure.value} mmHg (SBP)` : 'No data for this date'}
+            {healthScores.bloodPressure.value
+              ? `${healthScores.bloodPressure.value} mmHg (SBP)`
+              : 'No data for this date'}
           </Text>
           <Text style={styles.metricDate}>
-            {healthScores.bloodPressure.date ? formatDate(healthScores.bloodPressure.date) : 'Not recorded'}
+            {healthScores.bloodPressure.date
+              ? formatDate(healthScores.bloodPressure.date)
+              : 'Not recorded'}
           </Text>
         </View>
       </View>
 
       {/* Info Card */}
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>About Your Score</Text>
+        <View style={styles.infoHeader}>
+          <View style={styles.infoIconContainer}>
+            <Text style={styles.infoIconText}>
+              <Image
+                source={require('../../Assets/benchmark.png')}
+                style={{width: 40, height: 40, marginBottom: -5}}
+                resizeMode="contain"
+              />
+            </Text>
+          </View>
+          <Text style={styles.infoTitle}>About Your Score</Text>
+        </View>
         <Text style={styles.infoText}>
-          Your wellness score is calculated based on weighted averages of your health metrics:
+          Your wellness score is calculated using weighted averages of your
+          health metrics:
         </Text>
-        <Text style={styles.infoText}>• Sleep Duration: 40%</Text>
-        <Text style={styles.infoText}>• Daily Steps: 30%</Text>
-        <Text style={styles.infoText}>• Resting Heart Rate: 20%</Text>
-        <Text style={styles.infoText}>• Blood Pressure: 10%</Text>
-        <Text style={styles.infoTextNote}>
-          Note: All metrics must be recorded for the selected date ({targetDate}) to calculate the wellness score.
-        </Text>
+        <View style={styles.infoMetricsList}>
+          <View style={styles.infoMetricRow}>
+            <View style={styles.infoMetricDot} />
+            <Text style={styles.infoMetricText}>Sleep Duration (40%)</Text>
+          </View>
+          <View style={styles.infoMetricRow}>
+            <View style={styles.infoMetricDot} />
+            <Text style={styles.infoMetricText}>Daily Steps (30%)</Text>
+          </View>
+          <View style={styles.infoMetricRow}>
+            <View style={styles.infoMetricDot} />
+            <Text style={styles.infoMetricText}>Resting Heart Rate (20%)</Text>
+          </View>
+          <View style={styles.infoMetricRow}>
+            <View style={styles.infoMetricDot} />
+            <Text style={styles.infoMetricText}>Blood Pressure (10%)</Text>
+          </View>
+        </View>
+        <View style={styles.infoNoteContainer}>
+          <Text style={styles.infoTextNote}>
+            All metrics must be recorded for {targetDate} to calculate the
+            wellness score.
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -621,241 +826,374 @@ const HealthScoreScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F9FAFB',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F9FAFB',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   datePickerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   dateNavButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 22,
-    backgroundColor: '#F0F0F0',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
   },
   dateNavButtonActive: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#EEF2FF',
   },
   dateNavButtonText: {
-    fontSize: 18,
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 20,
+    color: '#374151',
+    fontWeight: '600',
   },
   dateNavButtonTextDisabled: {
-    color: '#CCC',
+    color: '#D1D5DB',
   },
   dateDisplayButton: {
     flex: 1,
     marginHorizontal: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#6200EE',
-    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: '#6366F1',
+    borderRadius: 12,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   dateDisplayText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   todayBadge: {
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: '#FF9800',
-    borderRadius: 12,
+    marginLeft: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#F59E0B',
+    borderRadius: 10,
+    shadowColor: '#F59E0B',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   todayBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   overallScoreContainer: {
     backgroundColor: '#FFFFFF',
-    padding: 24,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#E5E7EB',
   },
   headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   dateText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
+    color: '#6B7280',
+    marginBottom: 24,
+    fontWeight: '500',
   },
   warningContainer: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    borderWidth: 1,
-    borderColor: '#FFC107',
-    marginVertical: 16,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    marginVertical: 8,
     width: '100%',
+    shadowColor: '#F59E0B',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  warningIconContainer: {
+    marginRight: 14,
+    marginTop: 2,
   },
   warningIcon: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 28,
   },
   warningTextContainer: {
     flex: 1,
   },
   warningTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#856404',
+    fontWeight: '700',
+    color: '#92400E',
     marginBottom: 8,
+    letterSpacing: 0.2,
   },
   warningText: {
     fontSize: 14,
-    color: '#856404',
-    marginBottom: 8,
+    color: '#78350F',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  missingMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  bulletPoint: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F59E0B',
+    marginRight: 10,
   },
   warningMetric: {
     fontSize: 14,
-    color: '#856404',
-    marginLeft: 8,
-    marginTop: 4,
+    color: '#78350F',
+    fontWeight: '500',
   },
   circularProgressContainer: {
-    marginVertical: 16,
+    marginVertical: 20,
   },
   scoreTextContainer: {
     alignItems: 'center',
   },
   scoreValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 56,
+    fontWeight: '800',
+    color: '#111827',
+    letterSpacing: -1,
+  },
+  scoreLabelContainer: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
   },
   scoreLabel: {
     fontSize: 16,
-    color: '#666',
-    marginTop: 4,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   metricsContainer: {
-    padding: 16,
+    padding: 20,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 16,
+    letterSpacing: -0.3,
   },
   metricCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
   metricCardMissing: {
-    backgroundColor: '#F9F9F9',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    opacity: 0.7,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    opacity: 0.6,
   },
   metricHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   metricTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
   },
   metricIcon: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 28,
+  },
+  metricTitleContainer: {
+    flex: 1,
   },
   metricTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 6,
+    letterSpacing: 0.1,
+  },
+  weightBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   metricWeight: {
     fontSize: 12,
-    color: '#999',
-    marginTop: 2,
+    color: '#6B7280',
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   metricScoreContainer: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minWidth: 60,
+    alignItems: 'center',
   },
   metricScore: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   metricValue: {
     fontSize: 18,
-    fontWeight: '500',
-    color: '#555',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+    letterSpacing: 0.1,
   },
   metricDate: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   infoCard: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    padding: 16,
-    margin: 16,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 16,
+    padding: 20,
+    margin: 20,
     marginTop: 8,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    shadowColor: '#6366F1',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  infoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  infoIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  infoIconText: {
+    fontSize: 18,
   },
   infoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1976D2',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#3730A3',
+    letterSpacing: 0.2,
   },
   infoText: {
     fontSize: 14,
-    color: '#555',
-    lineHeight: 20,
-    marginBottom: 4,
+    color: '#4338CA',
+    lineHeight: 22,
+    marginBottom: 14,
+    fontWeight: '500',
+  },
+  infoMetricsList: {
+    marginBottom: 14,
+  },
+  infoMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  infoMetricDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#6366F1',
+    marginRight: 12,
+  },
+  infoMetricText: {
+    fontSize: 14,
+    color: '#4338CA',
+    fontWeight: '600',
+    letterSpacing: 0.1,
+  },
+  infoNoteContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366F1',
   },
   infoTextNote: {
     fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-    marginTop: 8,
+    color: '#4B5563',
+    lineHeight: 20,
     fontStyle: 'italic',
+    fontWeight: '500',
   },
 });
-
 export default HealthScoreScreen;

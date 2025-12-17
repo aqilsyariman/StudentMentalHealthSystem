@@ -20,7 +20,7 @@ const screenWidth = Dimensions.get('window').width;
 
 type SleepLog = {
   bedTime: Date;
-  wakeTime: Date;
+  wakeTime: any;
   duration: number;
   score: number;
   timestamp: any;
@@ -294,7 +294,7 @@ const ManualSleepTracker = ({}: any) => {
     const last7Logs = allLogs.slice(0, 7).reverse();
     
     const labels = last7Logs.map((log) => {
-      const date = log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp);
+      const date = log.wakeTime.toDate ? log.wakeTime.toDate() : new Date(log.wakeTime);
       const month = (date.getMonth() + 1).toString();
       const day = date.getDate().toString();
       return `${month}/${day}`;
@@ -520,7 +520,7 @@ const ManualSleepTracker = ({}: any) => {
               <View key={index} style={styles.logCard}>
                 <View style={styles.logHeader}>
                   <Text style={styles.logDate}>
-                    {formatDate(log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp))}
+                    {formatDate(log.wakeTime.toDate ? log.wakeTime.toDate() : new Date(log.wakeTime))}
                   </Text>
                   <View style={styles.logHeaderBadges}>
                     <View style={[styles.qualityBadgeSmall, {backgroundColor: quality.color + '20'}]}>

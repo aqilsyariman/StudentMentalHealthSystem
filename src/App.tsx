@@ -150,7 +150,7 @@ const App = () => {
               component={ChatScreen}
             />
               <Stack.Screen
-              options={{headerShown: true, title: 'HealthScoreScreen'}}
+              options={{headerShown: true, title: 'Health Score'}}
               name="HealthScoreScreen"
               component={HealthScoreScreen}
             />

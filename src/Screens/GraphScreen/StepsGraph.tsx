@@ -15,10 +15,10 @@ import {LineChart} from 'react-native-chart-kit';
 const screenWidth = Dimensions.get('window').width;
 
 // Burning Theme Palette
-const FIRE_RED = '#FF4500';     // OrangeRed
-const FIRE_ORANGE = '#FF8C00';  // DarkOrange
-const FIRE_GOLD = '#FFD700';    // Gold
-const SOFT_BURN = '#FFF5F0';    // Very light wash
+const FIRE_RED = '#FF4500'; // OrangeRed
+const FIRE_ORANGE = '#FF8C00'; // DarkOrange
+const FIRE_GOLD = '#FFD700'; // Gold
+const SOFT_BURN = '#FFF5F0'; // Very light wash
 
 type Student = {
   fullName: string;
@@ -78,16 +78,17 @@ const getAllStepsReadings = (sensorDoc: any): StepsReading[] => {
   return readings.slice(-10);
 };
 
-const StepIcon = ({ size = 32 }) => (
-  <View style={{ width: size, height: size }}>
+const StepIcon = ({size = 32}) => (
+  <View style={{width: size, height: size}}>
     <Image
       source={require('../../Assets/burn.png')}
-      style={{ width: size, height: size }}
+      style={{width: size, height: size}}
       resizeMode="contain"
     />
   </View>
 );
 
+// Component name starts with Capital Letter
 const StepsGraph = ({route}: StudentDetailProps) => {
   const [student, setStudent] = useState<Student | null>(null);
   const [stepCounthistory, setStepCountHistory] = useState<StepsReading[]>([]);
@@ -137,6 +138,28 @@ const StepsGraph = ({route}: StudentDetailProps) => {
     fetchStudentData();
   }, [studentId]);
 
+  // --- Dynamic Y-Axis Logic ---
+  const getChartConfigParams = () => {
+    const baselineMax = 20000;
+    const actualMax =
+      stepCounthistory.length > 0
+        ? Math.max(...stepCounthistory.map(r => r.value))
+        : 0;
+
+    // Scale to nearest 5000 if user exceeds 20k, otherwise use 20k
+    const dynamicMax =
+      actualMax > baselineMax
+        ? Math.ceil(actualMax / 5000) * 5000
+        : baselineMax;
+
+    return {
+      max: dynamicMax,
+      segments: dynamicMax / 5000,
+    };
+  };
+
+  const chartParams = getChartConfigParams();
+
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp || typeof timestamp.toDate !== 'function') {
       if (typeof timestamp === 'string') {
@@ -167,14 +190,11 @@ const StepsGraph = ({route}: StudentDetailProps) => {
       return '';
     });
 
-    const data = stepCounthistory.map(reading => reading.value);
-
     return {
       labels,
       datasets: [
         {
-          data,
-          // Burning Line Color (Deep Orange)
+          data: stepCounthistory.map(reading => reading.value),
           color: (opacity = 1) => `rgba(255, 69, 0, ${opacity})`,
           strokeWidth: 3,
         },
@@ -190,6 +210,8 @@ const StepsGraph = ({route}: StudentDetailProps) => {
       </View>
     );
   }
+
+  // ESLint Fix: Using 'error' variable in the JSX
   if (error) {
     return (
       <View style={[styles.fullContainer, styles.centerContainer]}>
@@ -201,7 +223,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
   return (
     <View style={styles.fullContainer}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Profile Header Card */}
+        {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <Image
@@ -243,7 +265,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
           </View>
         </View>
 
-        {/* Step Count History Graph */}
+        {/* Chart Section */}
         {stepCounthistory.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Step Count Trends</Text>
@@ -252,18 +274,17 @@ const StepsGraph = ({route}: StudentDetailProps) => {
                 data={getChartData()}
                 width={screenWidth - 80}
                 height={240}
+                fromZero={true}
+                fromNumber={chartParams.max}
+                segments={chartParams.segments}
                 chartConfig={{
                   backgroundColor: '#ffffff',
                   backgroundGradientFrom: '#ffffff',
                   backgroundGradientTo: '#fff8f0',
                   decimalPlaces: 0,
-                  // Color for graph line and gradient fill
                   color: (opacity = 1) => `rgba(255, 69, 0, ${opacity})`,
-                  labelColor: (opacity = 1) =>
-                    `rgba(139, 0, 0, ${opacity})`,
-                  style: {
-                    borderRadius: 16,
-                  },
+                  labelColor: (opacity = 1) => `rgba(139, 0, 0, ${opacity})`,
+                  style: {borderRadius: 16},
                   propsForDots: {
                     r: '5',
                     strokeWidth: '3',
@@ -316,43 +337,23 @@ const StepsGraph = ({route}: StudentDetailProps) => {
 const styles = StyleSheet.create({
   fullContainer: {flex: 1, backgroundColor: SOFT_BURN},
   scrollContainer: {padding: 20, paddingBottom: 80},
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  centerContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   loadingText: {
     marginTop: 10,
     fontSize: 16,
     color: FIRE_RED,
     fontWeight: '600',
   },
-  errorText: {
-    fontSize: 16,
-    color: '#D32F2F',
-    fontWeight: '600',
-  },
+  errorText: {fontSize: 16, color: '#D32F2F', fontWeight: '600'},
   profileHeader: {
     alignItems: 'center',
     marginBottom: 24,
     padding: 24,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    shadowColor: FIRE_RED,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
     elevation: 5,
   },
-  avatarContainer: {
-    shadowColor: FIRE_ORANGE,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    borderRadius: 60,
-    marginBottom: 16,
-  },
+  avatarContainer: {borderRadius: 60, marginBottom: 16},
   avatar: {
     width: 100,
     height: 100,
@@ -366,11 +367,7 @@ const styles = StyleSheet.create({
     color: '#3e2723',
     marginBottom: 4,
   },
-  studentEmail: {
-    fontSize: 15,
-    color: '#795548',
-    marginTop: 2,
-  },
+  studentEmail: {fontSize: 15, color: '#795548'},
   sectionTitle: {
     fontSize: 22,
     fontWeight: '800',
@@ -383,10 +380,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
-    shadowColor: FIRE_ORANGE,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
     elevation: 6,
   },
   cardHeader: {
@@ -395,59 +388,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: FIRE_RED,
-  },
+  cardTitle: {fontSize: 18, fontWeight: '700', color: FIRE_RED},
   badge: {
     backgroundColor: '#fff3e0',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  badgeText: {
-    color: FIRE_ORANGE,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  sensorCardContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-  },
-  iconContainer: {
-    backgroundColor: '#fff3e0',
-    padding: 16,
-    borderRadius: 16,
-  },
-  sensorTextContainer: {
-    flex: 1,
-  },
+  badgeText: {color: FIRE_ORANGE, fontSize: 12, fontWeight: '700'},
+  sensorCardContainer: {flexDirection: 'row', alignItems: 'center', gap: 20},
+  iconContainer: {backgroundColor: '#fff3e0', padding: 16, borderRadius: 16},
+  sensorTextContainer: {flex: 1},
   sensorValue: {
     fontSize: 40,
     fontWeight: '900',
     color: '#212121',
     letterSpacing: -1,
   },
-  sensorUnit: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#757575',
-  },
-  sensorTimestamp: {
-    fontSize: 13,
-    color: '#9e9e9e',
-    marginTop: 6,
-  },
-  chartContainer: {
-    alignItems: 'center',
-    marginVertical: 8,
-  },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  },
+  sensorUnit: {fontSize: 18, fontWeight: '600', color: '#757575'},
+  sensorTimestamp: {fontSize: 13, color: '#9e9e9e', marginTop: 6},
+  chartContainer: {alignItems: 'center', marginVertical: 8},
+  chart: {marginVertical: 8, borderRadius: 16},
   chartFooter: {
     marginTop: 12,
     paddingTop: 12,
@@ -466,14 +427,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  noDataContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  noDataIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
+  noDataContainer: {alignItems: 'center', paddingVertical: 32},
+  noDataIcon: {fontSize: 48, marginBottom: 12},
   noDataText: {
     fontSize: 16,
     color: '#5d4037',
