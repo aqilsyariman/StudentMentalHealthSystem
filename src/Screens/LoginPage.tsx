@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {useState /*useEffect*/ } from 'react';
+import React, {useState /*useEffect*/} from 'react';
 import {
   Alert,
   StyleSheet,
@@ -46,7 +46,7 @@ const LoginPage = () => {
         email,
         password,
       );
-      await userCredential.user.updateProfile({ displayName: fullName });
+      await userCredential.user.updateProfile({displayName: fullName});
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         Alert.alert('That email address is already in use!');
@@ -84,11 +84,10 @@ const LoginPage = () => {
   const formButtonScale = useSharedValue(1);
 
   const imageAnimatedStyle = useAnimatedStyle(() => {
-
     const IS_SMALL_SCREEN = height < 700;
     const interpolation = interpolate(
       imagePosition.value,
-      [0, (IS_SMALL_SCREEN ? 1.2 : 1)],
+      [0, IS_SMALL_SCREEN ? 1.2 : 1],
       // ✅ FIX: Wrap the ternary operator in parentheses ()
       [-height / (IS_SMALL_SCREEN ? 1.8 : 2), 0],
     );
@@ -167,7 +166,7 @@ const LoginPage = () => {
                 <Ellipse cx={width / 2} rx={height} ry={height + 100} />
               </ClipPath>
               <SvgImage
-                href={require('../Assets/MH logo.jpg')}
+                href={require('../Assets/new login logo.png')}
                 width={width}
                 height={height + 270}
                 preserveAspectRatio="xMidYMid slice"
@@ -183,13 +182,23 @@ const LoginPage = () => {
           <View style={styles.bottomContainer}>
             {/* Buttons */}
             <Animated.View style={buttonAnimatedStyle}>
-              <Pressable style={styles.button} onPress={loginHandler}>
+              <Pressable
+                style={({pressed}) => [
+                  styles.button,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={loginHandler}>
                 <Text style={styles.buttonText}>LOG IN</Text>
               </Pressable>
             </Animated.View>
 
             <Animated.View style={buttonAnimatedStyle}>
-              <Pressable style={styles.button} onPress={registerHandler}>
+              <Pressable
+                style={({pressed}) => [
+                  styles.button,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={registerHandler}>
                 <Text style={styles.buttonText}>REGISTER</Text>
               </Pressable>
             </Animated.View>
@@ -266,23 +275,39 @@ const IS_SMALL_SCREEN = height < 700;
 
 const styles = StyleSheet.create({
   container: {flex: 1, justifyContent: 'flex-end'},
+
   button: {
-    backgroundColor: 'rgba(123,104,238,0.8)',
+    backgroundColor: '#2b7de1ff',
     height: 55,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 35,
     marginHorizontal: 20,
     marginVertical: 10,
-    borderWidth: 1,
-    borderColor: 'white',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#5C44E7',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.44,
+    shadowRadius: 10.32,
+    elevation: 16,
+  },
+  buttonPressed: {
+    backgroundColor: '#7c6ae2ff',
+    transform: [{scale: 0.98}],
+    shadowOpacity: 0.3,
+    elevation: 8,
   },
   buttonText: {
-    fontSize: 20,
-    fontWeight: '600',
     color: 'white',
-    letterSpacing: 0.5,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1.5,
   },
+
   bottomContainer: {
     justifyContent: 'center',
     height: height / 3,
@@ -297,26 +322,30 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
   },
   formButton: {
-    backgroundColor: 'rgba(123,104,238,0.8)',
+    backgroundColor: '#5C44E7',
     height: 55,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 35,
     marginHorizontal: 20,
     marginVertical: 10,
-    borderWidth: 1,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#5C44E7',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.44,
+    shadowRadius: 10.32,
+    elevation: 16,
   },
   formInputContainer: {
     marginBottom: 70,
     ...StyleSheet.absoluteFillObject,
     zIndex: -1,
     justifyContent: 'center',
+
   },
   closeButtonContainer: {
     height: 40,
@@ -331,9 +360,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     alignItems: 'center',
     borderRadius: 20,
-    // ✅ -- FIX 2: Use the responsive value --
-    // On small screens, use a smaller offset (-40)
-    // On tall screens, use your original offset (-60)
     top: IS_SMALL_SCREEN ? -25 : -25,
   },
 });
