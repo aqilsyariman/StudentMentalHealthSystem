@@ -60,10 +60,17 @@ const DashboardScreen = ({navigation}: Props) => {
   const [heartRate, setHeartRateState] = useState<HealthDataWithScore | null>(
     null,
   );
+  // const [sleep, setSleep] = useState<{
+  //   summary: any;
+  //   date: string | null;
+  // } | null>(null);
+
   const [sleep, setSleep] = useState<{
-    summary: any;
-    date: string | null;
-  } | null>(null);
+  summary: any;
+  date: string | null;
+  score?: number | null;
+} | null>(null);
+
   const [hw, setHW] = useState<{
     height: number | null;
     weight: number | null;
@@ -76,6 +83,7 @@ const DashboardScreen = ({navigation}: Props) => {
   const heartRateScore = heartRate?.score;
   const stepCountScore = steps?.score;
   const bpScore = bp?.score;
+  const sleepScore = sleep?.score;
 
   const handleSignOut = () => {
     Alert.alert(
@@ -216,6 +224,21 @@ const DashboardScreen = ({navigation}: Props) => {
     });
   };
 
+  const getSleepQuality = (hours: number) => {
+  if (hours >= 7 && hours <= 9) return { text: 'Excellent', color: '#10B981' };
+  if (hours >= 6 && hours < 7) return { text: 'Good', color: '#3B82F6' };
+  if (hours >= 5 && hours < 6) return { text: 'Fair', color: '#F59E0B' };
+  return { text: 'Poor', color: '#EF4444' };
+};
+
+const getScoreColor = (s: number | null | undefined) => {
+  if (s === null || s === undefined) return '#9CA3AF';
+  if (s >= 85) return '#10B981';
+  if (s >= 70) return '#3B82F6';
+  if (s >= 50) return '#F59E0B';
+  return '#EF4444';
+};
+
   return (
     <View style={styles.fullContainer}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FF" />
@@ -301,63 +324,94 @@ const DashboardScreen = ({navigation}: Props) => {
         />
 
         <TouchableOpacity
-          style={styles.detailCard}
-          onPress={() => navigation.navigate('ManualSleepTracker')}
-          activeOpacity={0.7}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardHeaderLeft}>
-              <View
+  style={styles.detailCard}
+  onPress={() => navigation.navigate('ManualSleepTracker')}
+  activeOpacity={0.7}>
+  <View style={styles.cardHeader}>
+    <View style={styles.cardHeaderLeft}>
+      <View
+        style={[
+          styles.cardIconBadge,
+          {backgroundColor: '#6366F1' + '15'},
+        ]}>
+        <Text style={styles.cardIcon}>
+          <Image
+            source={require('../Assets/moon.png')}
+            style={{width: 30, height: 30, marginBottom: -5}}
+            resizeMode="contain"
+          />
+        </Text>
+      </View>
+      <Text style={[styles.cardTitle, {color: '#722fdeff'}]}>
+        Sleep Analysis
+      </Text>
+    </View>
+    <View style={styles.sleepHeaderRight}>
+      {sleepScore !== null && sleepScore !== undefined && (
+        <View
+          style={[
+            styles.scoreChip,
+            {backgroundColor: getScoreColor(sleepScore) + '15'},
+          ]}>
+          <Text style={[styles.scoreChipText, {color: getScoreColor(sleepScore)}]}>
+            {sleepScore}
+          </Text>
+        </View>
+      )}
+      <Text style={styles.tapToLogText}>Tap to Log</Text>
+    </View>
+  </View>
+  <View style={styles.cardContent}>
+    {sleep?.summary ? (
+      <View>
+        <View style={styles.sleepSummary}>
+          <Text style={styles.sleepDurationLabel}>
+            Last Sleep Duration
+          </Text>
+          <Text style={styles.sleepDurationValue}>
+            {sleep.summary.duration} hours
+          </Text>
+          {sleep.summary.duration && (
+            <View
+              style={[
+                styles.qualityBadge,
+                {
+                  backgroundColor:
+                    getSleepQuality(parseFloat(sleep.summary.duration)).color + '20',
+                },
+              ]}>
+              <Text
                 style={[
-                  styles.cardIconBadge,
-                  {backgroundColor: '#6366F1' + '15'},
+                  styles.qualityText,
+                  {color: getSleepQuality(parseFloat(sleep.summary.duration)).color},
                 ]}>
-                <Text style={styles.cardIcon}>
-                  <Image
-                    source={require('../Assets/moon.png')}
-                    style={{width: 30, height: 30, marginBottom: -5}}
-                    resizeMode="contain"
-                  />
-                </Text>
-              </View>
-              <Text style={[styles.cardTitle, {color: '#722fdeff'}]}>
-                Sleep Analysis
+                {getSleepQuality(parseFloat(sleep.summary.duration)).text}
               </Text>
             </View>
-            <Text style={styles.tapToLogText}>Tap to Log</Text>
+          )}
+        </View>
+        <View style={styles.sleepTimes}>
+          <View style={styles.sleepTimeItem}>
+            <Text style={styles.sleepTimeLabel}>🌙 Bed Time</Text>
+            <Text style={styles.sleepTimeValue}>
+              {sleep.summary.bedTime}
+            </Text>
           </View>
-          <View style={styles.cardContent}>
-            {sleep?.summary ? (
-              <View>
-                <View style={styles.sleepSummary}>
-                  <Text style={styles.sleepDurationLabel}>
-                    Last Sleep Duration
-                  </Text>
-                  <Text style={styles.sleepDurationValue}>
-                    {sleep.summary.duration} hours
-                  </Text>
-                </View>
-                <View style={styles.sleepTimes}>
-                  <View style={styles.sleepTimeItem}>
-                    <Text style={styles.sleepTimeLabel}>🌙 Bed Time</Text>
-                    <Text style={styles.sleepTimeValue}>
-                      {sleep.summary.bedTime}
-                    </Text>
-                  </View>
-                  <View style={styles.sleepTimeItem}>
-                    <Text style={styles.sleepTimeLabel}>☀️ Wake Time</Text>
-                    <Text style={styles.sleepTimeValue}>
-                      {sleep.summary.wakeTime}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <Text style={styles.noData}>
-                No sleep data logged yet. Tap to start tracking!
-              </Text>
-            )}
+          <View style={styles.sleepTimeItem}>
+            <Text style={styles.sleepTimeLabel}>☀️ Wake Time</Text>
+            <Text style={styles.sleepTimeValue}>
+              {sleep.summary.wakeTime}
+            </Text>
           </View>
-        </TouchableOpacity>
+        </View>
+      </View>
+    ) : (
+      <Text style={styles.noData}>
+        No sleep data logged yet. Tap to start tracking!
+      </Text>
+    )}
+  </View>
+</TouchableOpacity>
 
         {/* Main Health Cards */}
         <DetailCard
@@ -1004,6 +1058,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
+  sleepHeaderRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+qualityBadge: {
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 12,
+  marginTop: 8,
+},
+qualityText: {
+  fontSize: 12,
+  fontWeight: '700',
+  textTransform: 'uppercase',
+},
 });
 
 export default DashboardScreen;

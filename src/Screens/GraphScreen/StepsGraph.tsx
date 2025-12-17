@@ -10,10 +10,15 @@ import {
   Dimensions,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import Svg, {Path} from 'react-native-svg';
 import {LineChart} from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get('window').width;
+
+// Burning Theme Palette
+const FIRE_RED = '#FF4500';     // OrangeRed
+const FIRE_ORANGE = '#FF8C00';  // DarkOrange
+const FIRE_GOLD = '#FFD700';    // Gold
+const SOFT_BURN = '#FFF5F0';    // Very light wash
 
 type Student = {
   fullName: string;
@@ -61,22 +66,25 @@ const getAllStepsReadings = (sensorDoc: any): StepsReading[] => {
   }
 
   readings.sort((a, b) => {
-    const timeA = a.timestamp.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp).getTime();
-    const timeB = b.timestamp.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp).getTime();
+    const timeA = a.timestamp.toDate
+      ? a.timestamp.toDate().getTime()
+      : new Date(a.timestamp).getTime();
+    const timeB = b.timestamp.toDate
+      ? b.timestamp.toDate().getTime()
+      : new Date(b.timestamp).getTime();
     return timeA - timeB;
   });
 
   return readings.slice(-10);
 };
 
-const StepIcon = ({color = '#6f5be1ff', size = 32}) => (
-  <View style={{width: size, height: size}}>
-    <Svg viewBox="0 0 640 512" fill="none">
-      <Path
-        d="M192 160h32V32h-32c-35.35 0-64 28.65-64 64s28.65 64 64 64zM0 416c0 35.35 28.65 64 64 64h32V352H64c-35.35 0-64 28.65-64 64zm337.46-128c-34.91 0-76.16 13.12-104.73 32-24.79 16.38-44.52 32-104.73 32v128l57.53 15.97c26.21 7.28 53.01 13.12 80.31 15.05 32.69 2.31 65.6.67 97.58-6.2C472.9 481.3 512 429.22 512 384c0-64-84.18-96-174.54-96zM491.42 7.19C459.44.32 426.53-1.33 393.84.99c-27.3 1.93-54.1 7.77-80.31 15.04L256 32v128c60.2 0 79.94 15.62 104.73 32 28.57 18.88 69.82 32 104.73 32C555.82 224 640 192 640 128c0-45.22-39.1-97.3-148.58-120.81z"
-        fill={color}
-      />
-    </Svg>
+const StepIcon = ({ size = 32 }) => (
+  <View style={{ width: size, height: size }}>
+    <Image
+      source={require('../../Assets/burn.png')}
+      style={{ width: size, height: size }}
+      resizeMode="contain"
+    />
   </View>
 );
 
@@ -148,9 +156,10 @@ const StepsGraph = ({route}: StudentDetailProps) => {
     }
 
     const labels = stepCounthistory.map((reading, index) => {
-      // Show every other label to avoid crowding
       if (index % 2 === 0 || stepCounthistory.length <= 5) {
-        const date = reading.timestamp.toDate ? reading.timestamp.toDate() : new Date(reading.timestamp);
+        const date = reading.timestamp.toDate
+          ? reading.timestamp.toDate()
+          : new Date(reading.timestamp);
         const month = (date.getMonth() + 1).toString();
         const day = date.getDate().toString();
         return `${month}/${day}`;
@@ -162,18 +171,21 @@ const StepsGraph = ({route}: StudentDetailProps) => {
 
     return {
       labels,
-      datasets: [{
-        data,
-        color: (opacity = 1) => `rgba(111, 91, 225, ${opacity})`,
-        strokeWidth: 3,
-      }],
+      datasets: [
+        {
+          data,
+          // Burning Line Color (Deep Orange)
+          color: (opacity = 1) => `rgba(255, 69, 0, ${opacity})`,
+          strokeWidth: 3,
+        },
+      ],
     };
   };
 
   if (loading) {
     return (
       <View style={[styles.fullContainer, styles.centerContainer]}>
-        <ActivityIndicator size="large" color="#6f5be1ff" />
+        <ActivityIndicator size="large" color={FIRE_RED} />
         <Text style={styles.loadingText}>Loading Step Count Data...</Text>
       </View>
     );
@@ -205,7 +217,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
           <Text style={styles.studentEmail}>{student?.email}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>📊 Step Count Monitor</Text>
+        <Text style={styles.sectionTitle}>Step Count Monitor</Text>
 
         {/* Current Step Count Card */}
         <View style={styles.card}>
@@ -241,24 +253,26 @@ const StepsGraph = ({route}: StudentDetailProps) => {
                 width={screenWidth - 80}
                 height={240}
                 chartConfig={{
-                  backgroundColor: '#f8f9ff',
-                  backgroundGradientFrom: '#f8f9ff',
-                  backgroundGradientTo: '#ffffff',
+                  backgroundColor: '#ffffff',
+                  backgroundGradientFrom: '#ffffff',
+                  backgroundGradientTo: '#fff8f0',
                   decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(111, 91, 225, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
+                  // Color for graph line and gradient fill
+                  color: (opacity = 1) => `rgba(255, 69, 0, ${opacity})`,
+                  labelColor: (opacity = 1) =>
+                    `rgba(139, 0, 0, ${opacity})`,
                   style: {
                     borderRadius: 16,
                   },
                   propsForDots: {
                     r: '5',
                     strokeWidth: '3',
-                    stroke: '#6f5be1ff',
-                    fill: '#ffffff',
+                    stroke: FIRE_ORANGE,
+                    fill: FIRE_GOLD,
                   },
                   propsForBackgroundLines: {
                     strokeDasharray: '',
-                    stroke: '#e0e0e0',
+                    stroke: '#fce4ec',
                     strokeWidth: 1,
                   },
                 }}
@@ -276,9 +290,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
               <Text style={styles.chartNote}>
                 📅 Showing last {stepCounthistory.length} readings
               </Text>
-              <Text style={styles.chartSubNote}>
-                Dates displayed as MM/DD
-              </Text>
+              <Text style={styles.chartSubNote}>Dates displayed as MM/DD</Text>
             </View>
           </View>
         )}
@@ -286,9 +298,13 @@ const StepsGraph = ({route}: StudentDetailProps) => {
         {stepCounthistory.length === 0 && (
           <View style={styles.card}>
             <View style={styles.noDataContainer}>
-              <Text style={styles.noDataIcon}>📊</Text>
-              <Text style={styles.noDataText}>No step count history available</Text>
-              <Text style={styles.noDataSubText}>Data will appear once readings are recorded</Text>
+              <Text style={styles.noDataIcon}>🔥</Text>
+              <Text style={styles.noDataText}>
+                No step count history available
+              </Text>
+              <Text style={styles.noDataSubText}>
+                Data will appear once readings are recorded
+              </Text>
             </View>
           </View>
         )}
@@ -298,7 +314,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
 };
 
 const styles = StyleSheet.create({
-  fullContainer: {flex: 1, backgroundColor: '#f0f3ff'},
+  fullContainer: {flex: 1, backgroundColor: SOFT_BURN},
   scrollContainer: {padding: 20, paddingBottom: 80},
   centerContainer: {
     flex: 1,
@@ -308,12 +324,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#6f5be1ff',
+    color: FIRE_RED,
     fontWeight: '600',
   },
   errorText: {
     fontSize: 16,
-    color: '#FF6F61',
+    color: '#D32F2F',
     fontWeight: '600',
   },
   profileHeader: {
@@ -322,16 +338,16 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    shadowColor: '#6f5be1ff',
+    shadowColor: FIRE_RED,
     shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 5,
   },
   avatarContainer: {
-    shadowColor: '#6f5be1ff',
+    shadowColor: FIRE_ORANGE,
     shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
     borderRadius: 60,
@@ -342,23 +358,23 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 4,
-    borderColor: '#f0f3ff',
+    borderColor: SOFT_BURN,
   },
   studentName: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#333',
+    color: '#3e2723',
     marginBottom: 4,
   },
   studentEmail: {
     fontSize: 15,
-    color: '#888',
+    color: '#795548',
     marginTop: 2,
   },
   sectionTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#333',
+    color: '#3e2723',
     marginBottom: 16,
     marginTop: 8,
   },
@@ -367,9 +383,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
-    shadowColor: '#6f5be1ff',
+    shadowColor: FIRE_ORANGE,
     shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 6,
   },
@@ -382,16 +398,16 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#6f5be1ff',
+    color: FIRE_RED,
   },
   badge: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#fff3e0',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   badgeText: {
-    color: '#4caf50',
+    color: FIRE_ORANGE,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -401,7 +417,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   iconContainer: {
-    backgroundColor: '#f0f3ff',
+    backgroundColor: '#fff3e0',
     padding: 16,
     borderRadius: 16,
   },
@@ -411,17 +427,17 @@ const styles = StyleSheet.create({
   sensorValue: {
     fontSize: 40,
     fontWeight: '900',
-    color: '#333',
+    color: '#212121',
     letterSpacing: -1,
   },
   sensorUnit: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: '#757575',
   },
   sensorTimestamp: {
     fontSize: 13,
-    color: '#999',
+    color: '#9e9e9e',
     marginTop: 6,
   },
   chartContainer: {
@@ -436,17 +452,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: '#fbe9e7',
   },
   chartNote: {
     fontSize: 13,
-    color: '#666',
+    color: '#5d4037',
     textAlign: 'center',
     fontWeight: '600',
   },
   chartSubNote: {
     fontSize: 11,
-    color: '#999',
+    color: '#8d6e63',
     textAlign: 'center',
     marginTop: 4,
   },
@@ -460,13 +476,13 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     fontSize: 16,
-    color: '#666',
+    color: '#5d4037',
     textAlign: 'center',
     fontWeight: '600',
   },
   noDataSubText: {
     fontSize: 13,
-    color: '#999',
+    color: '#8d6e63',
     textAlign: 'center',
     marginTop: 6,
   },

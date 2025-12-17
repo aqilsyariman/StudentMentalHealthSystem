@@ -22,6 +22,7 @@ type SleepLog = {
   bedTime: Date;
   wakeTime: Date;
   duration: number;
+  score: number;
   timestamp: any;
 };
 
@@ -43,6 +44,7 @@ const ManualSleepTracker = ({}: any) => {
   const [allLogs, setAllLogs] = useState<SleepLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [averageSleep, setAverageSleep] = useState(0);
+  const [averageScore, setAverageScore] = useState(0);
 
   const user = auth().currentUser;
 
@@ -66,6 +68,7 @@ const ManualSleepTracker = ({}: any) => {
                 bedTime: log.bedTime.toDate(),
                 wakeTime: log.wakeTime.toDate(),
                 duration: log.duration,
+                score: log.score || 0,
                 timestamp: log.timestamp,
               }))
               .sort((a: any, b: any) => b.timestamp.toDate() - a.timestamp.toDate());
@@ -73,10 +76,12 @@ const ManualSleepTracker = ({}: any) => {
             setAllLogs(logs);
             setRecentLogs(logs.slice(0, 5));
             
-            // Calculate average
+            // Calculate averages
             if (logs.length > 0) {
-              const avg = logs.reduce((sum: number, log: SleepLog) => sum + log.duration, 0) / logs.length;
-              setAverageSleep(avg);
+              const avgDuration = logs.reduce((sum: number, log: SleepLog) => sum + log.duration, 0) / logs.length;
+              const avgScore = logs.reduce((sum: number, log: SleepLog) => sum + log.score, 0) / logs.length;
+              setAverageSleep(avgDuration);
+              setAverageScore(avgScore);
             }
           }
         }
@@ -92,6 +97,28 @@ const ManualSleepTracker = ({}: any) => {
     const diff = wake.getTime() - bed.getTime();
     const hours = diff / (1000 * 60 * 60);
     return Math.max(0, hours);
+  };
+
+  const calculateSleepScore = (duration: number) => {
+    if (duration >= 7 && duration <= 9) {
+      return 100;
+    } else if (duration >= 6 && duration < 7) {
+      return 85 + ((duration - 6) * 15);
+    } else if (duration > 9 && duration <= 10) {
+      return 100 - ((duration - 9) * 15);
+    } else if (duration >= 5 && duration < 6) {
+      return 65 + ((duration - 5) * 20);
+    } else if (duration > 10 && duration <= 11) {
+      return 85 - ((duration - 10) * 20);
+    } else if (duration >= 4 && duration < 5) {
+      return 40 + ((duration - 4) * 25);
+    } else if (duration > 11 && duration <= 12) {
+      return 65 - ((duration - 11) * 25);
+    } else if (duration < 4) {
+      return Math.max(0, duration * 10);
+    } else {
+      return Math.max(0, 40 - ((duration - 12) * 10));
+    }
   };
 
   const handleSaveSleep = async () => {
@@ -115,10 +142,13 @@ const ManualSleepTracker = ({}: any) => {
     setLoading(true);
 
     try {
+      const score = Math.round(calculateSleepScore(duration));
+      
       const sleepLog = {
         bedTime: firestore.Timestamp.fromDate(bedTime),
         wakeTime: firestore.Timestamp.fromDate(wakeTime),
         duration: parseFloat(duration.toFixed(2)),
+        score: score,
         timestamp: firestore.Timestamp.now(),
       };
 
@@ -135,17 +165,25 @@ const ManualSleepTracker = ({}: any) => {
           {merge: true},
         );
 
-      Alert.alert('Success', `Sleep logged: ${duration.toFixed(1)} hours`);
+      Alert.alert('Success', `Sleep logged: ${duration.toFixed(1)} hours (Score: ${score}/100)`);
 
       const newLog = {
         bedTime,
         wakeTime,
         duration: parseFloat(duration.toFixed(2)),
+        score: score,
         timestamp: firestore.Timestamp.now(),
       };
 
-      setAllLogs([newLog, ...allLogs]);
+      const updatedAllLogs = [newLog, ...allLogs];
+      setAllLogs(updatedAllLogs);
       setRecentLogs([newLog, ...recentLogs.slice(0, 4)]);
+
+      // Update averages
+      const avgDuration = updatedAllLogs.reduce((sum, log) => sum + log.duration, 0) / updatedAllLogs.length;
+      const avgScore = updatedAllLogs.reduce((sum, log) => sum + log.score, 0) / updatedAllLogs.length;
+      setAverageSleep(avgDuration);
+      setAverageScore(avgScore);
 
       const now = new Date();
       setBedTime(now);
@@ -156,6 +194,78 @@ const ManualSleepTracker = ({}: any) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteLog = async (logIndex: number) => {
+    if (!user) return;
+
+    Alert.alert(
+      'Delete Sleep Log',
+      'Are you sure you want to delete this sleep log?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // Remove the log from the array
+              const updatedLogs = allLogs.filter((_, index) => index !== logIndex);
+
+              // Convert logs back to Firestore format
+              const firestoreLogs = updatedLogs.map(log => ({
+                bedTime: firestore.Timestamp.fromDate(log.bedTime),
+                wakeTime: firestore.Timestamp.fromDate(log.wakeTime),
+                duration: log.duration,
+                score: log.score,
+                timestamp: log.timestamp,
+              }));
+
+              // Update Firestore
+              await firestore()
+                .collection('students')
+                .doc(user.uid)
+                .collection('sensorData')
+                .doc('sleep')
+                .set(
+                  {
+                    logs: firestoreLogs,
+                    latestSleep: firestoreLogs.length > 0 ? firestoreLogs[0] : null,
+                  },
+                  {merge: true},
+                );
+
+              // Update local state
+              setAllLogs(updatedLogs);
+              setRecentLogs(updatedLogs.slice(0, 5));
+
+              // Recalculate averages
+              if (updatedLogs.length > 0) {
+                const avgDuration = updatedLogs.reduce((sum, log) => sum + log.duration, 0) / updatedLogs.length;
+                const avgScore = updatedLogs.reduce((sum, log) => sum + log.score, 0) / updatedLogs.length;
+                setAverageSleep(avgDuration);
+                setAverageScore(avgScore);
+              } else {
+                setAverageSleep(0);
+                setAverageScore(0);
+              }
+
+              Alert.alert('Success', 'Sleep log deleted successfully');
+            } catch (err) {
+              console.error('Error deleting sleep log:', err);
+              Alert.alert('Error', 'Failed to delete sleep log. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const formatTime = (date: Date) => {
@@ -209,6 +319,13 @@ const ManualSleepTracker = ({}: any) => {
     return { text: 'Poor', color: '#EF4444' };
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return '#10B981';
+    if (score >= 70) return '#3B82F6';
+    if (score >= 50) return '#F59E0B';
+    return '#EF4444';
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.mainTitle}>💤 Sleep Tracker</Text>
@@ -217,18 +334,20 @@ const ManualSleepTracker = ({}: any) => {
       {allLogs.length > 0 && (
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Average Sleep</Text>
+            <Text style={styles.statLabel}>Avg Sleep</Text>
             <Text style={styles.statValue}>{averageSleep.toFixed(1)}h</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Avg Score</Text>
+            <Text style={[styles.statValue, {color: getScoreColor(averageScore)}]}>
+              {averageScore.toFixed(0)}
+            </Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>Total Logs</Text>
             <Text style={styles.statValue}>{allLogs.length}</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Last Night</Text>
-            <Text style={styles.statValue}>{allLogs[0]?.duration.toFixed(1)}h</Text>
           </View>
         </View>
       )}
@@ -365,10 +484,17 @@ const ManualSleepTracker = ({}: any) => {
             <Text style={styles.durationValue}>
               {calculateDuration(bedTime, wakeTime).toFixed(1)} hours
             </Text>
-            <View style={[styles.qualityBadge, {backgroundColor: getSleepQuality(calculateDuration(bedTime, wakeTime)).color + '20'}]}>
-              <Text style={[styles.qualityText, {color: getSleepQuality(calculateDuration(bedTime, wakeTime)).color}]}>
-                {getSleepQuality(calculateDuration(bedTime, wakeTime)).text}
-              </Text>
+            <View style={styles.scoreAndQualityRow}>
+              <View style={[styles.qualityBadge, {backgroundColor: getSleepQuality(calculateDuration(bedTime, wakeTime)).color + '20'}]}>
+                <Text style={[styles.qualityText, {color: getSleepQuality(calculateDuration(bedTime, wakeTime)).color}]}>
+                  {getSleepQuality(calculateDuration(bedTime, wakeTime)).text}
+                </Text>
+              </View>
+              <View style={[styles.scoreBadge, {backgroundColor: getScoreColor(calculateSleepScore(calculateDuration(bedTime, wakeTime))) + '20'}]}>
+                <Text style={[styles.scoreText, {color: getScoreColor(calculateSleepScore(calculateDuration(bedTime, wakeTime)))}]}>
+                  Score: {Math.round(calculateSleepScore(calculateDuration(bedTime, wakeTime)))}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -396,10 +522,17 @@ const ManualSleepTracker = ({}: any) => {
                   <Text style={styles.logDate}>
                     {formatDate(log.timestamp.toDate ? log.timestamp.toDate() : new Date(log.timestamp))}
                   </Text>
-                  <View style={[styles.qualityBadgeSmall, {backgroundColor: quality.color + '20'}]}>
-                    <Text style={[styles.qualityTextSmall, {color: quality.color}]}>
-                      {quality.text}
-                    </Text>
+                  <View style={styles.logHeaderBadges}>
+                    <View style={[styles.qualityBadgeSmall, {backgroundColor: quality.color + '20'}]}>
+                      <Text style={[styles.qualityTextSmall, {color: quality.color}]}>
+                        {quality.text}
+                      </Text>
+                    </View>
+                    <View style={[styles.scoreBadgeSmall, {backgroundColor: getScoreColor(log.score) + '20'}]}>
+                      <Text style={[styles.scoreTextSmall, {color: getScoreColor(log.score)}]}>
+                        {log.score}
+                      </Text>
+                    </View>
                   </View>
                 </View>
                 <View style={styles.logRow}>
@@ -414,6 +547,14 @@ const ManualSleepTracker = ({}: any) => {
                   <Text style={styles.logLabel}>⏱️ Duration:</Text>
                   <Text style={styles.logDuration}>{log.duration.toFixed(1)}h</Text>
                 </View>
+                
+                {/* Delete Button */}
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteLog(index)}
+                  disabled={loading}>
+                  <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+                </TouchableOpacity>
               </View>
             );
           })}
@@ -585,13 +726,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginBottom: 8,
   },
+  scoreAndQualityRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   qualityBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    alignSelf: 'flex-start',
   },
   qualityText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  scoreBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  scoreText: {
     fontSize: 12,
     fontWeight: '700',
   },
@@ -650,12 +804,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
+  logHeaderBadges: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   qualityBadgeSmall: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
   qualityTextSmall: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scoreBadgeSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  scoreTextSmall: {
     fontSize: 11,
     fontWeight: '700',
   },
@@ -686,6 +853,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#6366F1',
+  },
+  deleteButton: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  deleteButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

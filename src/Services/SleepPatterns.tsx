@@ -1,19 +1,8 @@
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-
-export const getSleepData = async (
-  callback: (data: {
-    summary: any;
-    date: string | null;
-  } | null) => void,
-) => {
+export const getSleepData = async (callback: Function) => {
   const user = auth().currentUser;
-
-  if (!user) {
-    console.warn('User not authenticated for sleep data.');
-    callback(null);
-    return;
-  }
+  if (!user) return;
 
   try {
     const sleepDoc = await firestore()
@@ -27,22 +16,20 @@ export const getSleepData = async (
       const data = sleepDoc.data();
       if (data?.latestSleep) {
         const latest = data.latestSleep;
-        const bedTime = latest.bedTime.toDate();
-        const wakeTime = latest.wakeTime.toDate();
-
         callback({
           summary: {
-            duration: latest.duration,
-            bedTime: bedTime.toLocaleTimeString('en-US', {
+            duration: latest.duration.toFixed(1),
+            bedTime: latest.bedTime.toDate().toLocaleTimeString('en-US', {
               hour: 'numeric',
-              minute: '2-digit',
+              minute: '2-digit'
             }),
-            wakeTime: wakeTime.toLocaleTimeString('en-US', {
+            wakeTime: latest.wakeTime.toDate().toLocaleTimeString('en-US', {
               hour: 'numeric',
-              minute: '2-digit',
+              minute: '2-digit'
             }),
           },
-          date: wakeTime.toISOString(),
+          date: latest.timestamp.toDate().toISOString(),
+          score: latest.score // Add this line
         });
       } else {
         callback(null);
@@ -50,8 +37,8 @@ export const getSleepData = async (
     } else {
       callback(null);
     }
-  } catch (err) {
-    console.error('Error fetching sleep data:', err);
+  } catch (error) {
+    console.error('Error fetching sleep data:', error);
     callback(null);
   }
 };
