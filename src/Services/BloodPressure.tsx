@@ -26,9 +26,12 @@ const calculateBpScore = (sbp: number): number => {
 
 const SAVE_TO_FIRESTORE = true;
 
-// --- Helper function to get the date string ---
+// Get date string in local timezone (YYYY-MM-DD format)
 const getLocalDateString = (date: Date) => {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export const getBloodPressure = async (
@@ -61,9 +64,8 @@ export const getBloodPressure = async (
     const rawDBP = latest.bloodPressureDiastolicValue;
     const readingDate = new Date(latest.startDate);
 
-    // === NEW CALCULATION ===
+    // Calculate BP Score
     const bpScore = calculateBpScore(rawSBP);
-    // =======================
 
     const newReadingData = {
       sys: rawSBP,
@@ -74,24 +76,22 @@ export const getBloodPressure = async (
 
     const dateKey = getLocalDateString(readingDate);
 
-    // --- ✅ Save to Firestore ---
+    // Save to Firestore
     if (SAVE_TO_FIRESTORE) {
       try {
-        // Get reference, change 'heartRate' to 'bloodPressure'
         const sensorDocRef = firestore()
           .collection('students')
           .doc(user.uid)
           .collection('sensorData')
-          .doc('bloodPressure'); // <-- New document path
+          .doc('bloodPressure');
 
-        // Set logic is identical to your other service functions
         await sensorDocRef.set(
           {
             data: {
               [dateKey]: firestore.FieldValue.arrayUnion(newReadingData),
             },
           },
-          { merge: true }, // This is essential
+          { merge: true },
         );
 
         console.log(`✅ Saved new BP reading (Score: ${bpScore}) to map key: ${dateKey}`);
@@ -99,14 +99,13 @@ export const getBloodPressure = async (
         console.error('❌ Firestore save failed (BP):', saveErr.message);
       }
     }
-    // --- End of Firestore Save ---
 
-    // Return the data, including the new score, via the callback
+    // Return the data via callback
     callback({
       sys: rawSBP,
       dia: rawDBP,
       date: latest.startDate,
-      score: bpScore, // Return the score
+      score: bpScore,
     });
   });
 };

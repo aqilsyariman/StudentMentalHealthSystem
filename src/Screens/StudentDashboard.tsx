@@ -400,7 +400,10 @@ const DashboardScreen = ({navigation}: Props) => {
             }}
           />
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>Hello, {studentName}! 👋</Text>
+            <Text style={styles.greeting}>
+              Hello,{' '}
+              {studentName?.charAt(0).toUpperCase() + studentName?.slice(1)}! 👋
+            </Text>
             <Text style={styles.subtitle}>Here's your health overview</Text>
           </View>
           <TouchableOpacity
@@ -408,7 +411,7 @@ const DashboardScreen = ({navigation}: Props) => {
             onPress={() => navigation.navigate('Messages')}
             activeOpacity={0.7}>
             <Image
-              source={require('../Assets/chat.png')}
+              source={require('../Assets/message.png')}
               style={{width: 40, height: 40}}
               resizeMode="contain"
             />
@@ -421,6 +424,7 @@ const DashboardScreen = ({navigation}: Props) => {
           onPress={() => navigation.navigate('HealthScoreScreen')}
           activeOpacity={0.7}>
           <Text style={styles.wellnessTitle}>Today's Wellness Score</Text>
+          <Text style={styles.wellnessSubtitle}>Track your daily progress</Text>
 
           {loadingWellness ? (
             <View style={styles.wellnessLoadingContainer}>
@@ -437,7 +441,7 @@ const DashboardScreen = ({navigation}: Props) => {
                   Incomplete Data
                 </Text>
                 <Text style={styles.wellnessIncompleteText}>
-                  Record all health metrics to see your wellness score
+                  Complete today's health metrics to unlock your wellness score{' '}
                 </Text>
               </View>
             </View>
@@ -552,21 +556,6 @@ const DashboardScreen = ({navigation}: Props) => {
               </Text>
             </View>
             <View style={styles.sleepHeaderRight}>
-              {sleepScore !== null && sleepScore !== undefined && (
-                <View
-                  style={[
-                    styles.scoreChip,
-                    {backgroundColor: getScoreColor(sleepScore) + '15'},
-                  ]}>
-                  <Text
-                    style={[
-                      styles.scoreChipText,
-                      {color: getScoreColor(sleepScore)},
-                    ]}>
-                    {sleepScore}
-                  </Text>
-                </View>
-              )}
               <Text style={styles.tapToLogText}>Tap to Log</Text>
             </View>
           </View>
@@ -603,6 +592,10 @@ const DashboardScreen = ({navigation}: Props) => {
                           getSleepQuality(parseFloat(sleep.summary.duration))
                             .text
                         }
+                        <Text style={{color: getScoreColor(sleepScore)}}>
+                          {' '}
+                          : {sleepScore}%
+                        </Text>
                       </Text>
                     </View>
                   )}
@@ -880,7 +873,7 @@ const MetricItem = ({
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#f9f8fcff',
   },
   scrollContainer: {
     padding: 20,
@@ -929,25 +922,32 @@ const styles = StyleSheet.create({
   },
   // Wellness Score Styles
   wellnessCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FCF8F8',
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
-    shadowColor: '#8B5CF6',
+    shadowColor: '#FCF8F8',
     shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 6,
-    borderWidth: 2,
+    borderWidth: 0,
     borderColor: '#E9D5FF',
   },
   wellnessTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 20,
+    fontSize: 29,
+    fontWeight: '700',
+    color: '#2C2C54',
+    marginBottom: 8,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: -0.5,
+  },
+  wellnessSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2C2C54',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   wellnessLoadingContainer: {
     alignItems: 'center',
@@ -983,6 +983,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#92400E',
     marginBottom: 4,
+
   },
   wellnessIncompleteText: {
     fontSize: 13,
@@ -1006,12 +1007,12 @@ const styles = StyleSheet.create({
   wellnessTapText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#8B5CF6',
+    color: '#2C2C54',
     marginRight: 6,
   },
   wellnessArrow: {
     fontSize: 16,
-    color: '#8B5CF6',
+    color: '#2C2C54',
     fontWeight: '700',
   },
   logoutButton: {
@@ -1082,6 +1083,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginLeft: 8,
   },
   quickStatValueContainer: {
     flexDirection: 'row',
@@ -1091,6 +1093,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '800',
     color: '#1F2937',
+    marginLeft: 5,
   },
   quickStatUnit: {
     fontSize: 14,
@@ -1382,7 +1385,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FCF8F8',
   },
   // Creates a soft glow/float effect around the circle
   shadowWrapper: {

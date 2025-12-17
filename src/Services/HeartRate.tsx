@@ -16,7 +16,6 @@ const calculateHeartRateScore = (rhr: number): number => {
     return 0; // Poor or worse
   }
 
-
   const score = 100 * (RHR_POOR - rhr) / RHR_RANGE;
 
   return Math.round(score);
@@ -25,10 +24,12 @@ const calculateHeartRateScore = (rhr: number): number => {
 
 const SAVE_TO_FIRESTORE = true;
 
-// --- Helper function to get the date string ---
+// Get date string in local timezone (YYYY-MM-DD format)
 const getLocalDateString = (date: Date) => {
-  // This creates a string like "2025-11-08"
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export const getHeartRate = async (
@@ -62,21 +63,18 @@ export const getHeartRate = async (
       const readingDate = new Date(latestReading.startDate);
       const rawRHR = latestReading.value;
 
-      // === NEW CALCULATION ===
+      // Calculate heart rate score
       const heartRateScore = calculateHeartRateScore(rawRHR);
-      // =======================
 
-      // 1. This is the new data object to save
       const newReadingData = {
         value: rawRHR,
-        score: heartRateScore, // <-- Includes the new calculated score
-        timestamp: firestore.Timestamp.fromDate(readingDate), // Use a real timestamp
+        score: heartRateScore,
+        timestamp: firestore.Timestamp.fromDate(readingDate),
       };
 
-      // 2. This is the key for the map, e.g., "2025-11-08"
       const dateKey = getLocalDateString(readingDate);
 
-      // --- ✅ Save to Firestore ---
+      // Save to Firestore
       if (SAVE_TO_FIRESTORE) {
         try {
           const sensorDocRef = firestore()
@@ -85,13 +83,12 @@ export const getHeartRate = async (
             .collection('sensorData')
             .doc('heartRate');
 
-          // This saves the raw value and the calculated score.
           await sensorDocRef.set({
               data: {
                 [dateKey]: firestore.FieldValue.arrayUnion(newReadingData),
               },
             },
-            { merge: true } // ✨ This is ESSENTIAL!
+            { merge: true }
           );
 
           console.log(`✅ Saved new HR reading (Score: ${heartRateScore}) to map key: ${dateKey}`);
@@ -99,9 +96,7 @@ export const getHeartRate = async (
           console.error('❌ Firestore save failed:', saveErr.message);
         }
       }
-      // --- End of Firestore Save ---
 
-      // Return the raw value, date, AND the new score via the callback
       callback({
         value: rawRHR, 
         date: latestReading.startDate, 

@@ -328,7 +328,7 @@ const ManualSleepTracker = ({}: any) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.mainTitle}>💤 Sleep Tracker</Text>
+
 
       {/* Sleep Stats Card */}
       {allLogs.length > 0 && (
@@ -553,7 +553,7 @@ const ManualSleepTracker = ({}: any) => {
                   style={styles.deleteButton}
                   onPress={() => handleDeleteLog(index)}
                   disabled={loading}>
-                  <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+                  <Text style={styles.deleteButtonText}>Delete</Text>
                 </TouchableOpacity>
               </View>
             );

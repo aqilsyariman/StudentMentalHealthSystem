@@ -274,10 +274,14 @@ const {height} = Dimensions.get('window');
 const IS_SMALL_SCREEN = height < 700;
 
 const styles = StyleSheet.create({
-  container: {flex: 1, justifyContent: 'flex-end'},
+  container: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: '#e7fdf5ff',
+  },
 
   button: {
-    backgroundColor: '#2b7de1ff',
+    backgroundColor: '#4e53bbff',
     height: 55,
     alignItems: 'center',
     justifyContent: 'center',
@@ -296,7 +300,7 @@ const styles = StyleSheet.create({
     elevation: 16,
   },
   buttonPressed: {
-    backgroundColor: '#7c6ae2ff',
+    backgroundColor: '#3d3281ff',
     transform: [{scale: 0.98}],
     shadowOpacity: 0.3,
     elevation: 8,
@@ -315,14 +319,14 @@ const styles = StyleSheet.create({
   textInput: {
     height: 50,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.2)',
+    borderColor: '#4e53bbff',
     marginHorizontal: 20,
     marginVertical: 10,
     borderRadius: 25,
     paddingLeft: 10,
   },
   formButton: {
-    backgroundColor: '#5C44E7',
+    backgroundColor: '#4e53bbff',
     height: 55,
     alignItems: 'center',
     justifyContent: 'center',
@@ -345,7 +349,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: -1,
     justifyContent: 'center',
-
   },
   closeButtonContainer: {
     height: 40,

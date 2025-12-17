@@ -24,12 +24,11 @@ const calculateStepCountScore = (steps: number): number => {
 
 const SAVE_TO_FIRESTORE = true;
 
-// 🎯 FIX: Use UTC methods to ensure the date key matches the day the steps were recorded in HealthKit/Mock, 
-// preventing timezone shifts from altering the date.
+// Get date string in local timezone (YYYY-MM-DD format)
 const getLocalDateString = (date: Date) => {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 
@@ -78,7 +77,7 @@ export const getDailyStepCount = (
         // Use the endDate from the sample (which is what HealthKit uses to define the day)
         const sampleEndDate = new Date(sample.endDate || sample.startDate);
         
-        // Use the corrected UTC date key generation
+        // Use local timezone for date key
         const dateKey = getLocalDateString(sampleEndDate);
 
         if (!stepsByDate[dateKey]) {
@@ -172,7 +171,6 @@ export const getDailyStepCount = (
           }
 
           // Return with the correct timestamp
-          // Note: latestTimestamp is a Date object derived from HealthKit. Its toISOString() uses UTC.
           const displayDate = existingTimestamp 
             ? existingTimestamp.toDate().toISOString() 
             : latestTimestamp.toISOString();
