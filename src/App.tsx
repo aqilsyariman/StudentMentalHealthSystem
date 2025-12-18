@@ -124,7 +124,17 @@ const App = () => {
               component={DetailsScreen}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Heart Rate Graph'}}
+              options={{
+                headerShown: true,
+                title: 'Heart Rate',
+                headerStyle: {
+                  backgroundColor: '#fff0f0', // Your color here
+                },
+                headerTintColor: '#393838ff', // Text/icon color
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
               name="HeartRateGraph"
               component={HeartRateGraph}
             />
@@ -134,22 +144,21 @@ const App = () => {
               component={StepsGraph}
             />
             <Stack.Screen
-            options={{headerShown: true, title: 'Sleep Tracker'}}
+              options={{headerShown: true, title: 'Sleep Tracker'}}
               name="ManualSleepTracker"
               component={ManualSleepTracker}
-           
             />
-             <Stack.Screen
+            <Stack.Screen
               options={{headerShown: false, title: 'Messages'}}
               name="Messages"
               component={Messages}
             />
-              <Stack.Screen
+            <Stack.Screen
               options={{headerShown: false, title: 'ChatScreen'}}
               name="ChatScreen"
               component={ChatScreen}
             />
-              <Stack.Screen
+            <Stack.Screen
               options={{headerShown: true, title: 'Health Score'}}
               name="HealthScoreScreen"
               component={HealthScoreScreen}

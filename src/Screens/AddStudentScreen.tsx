@@ -141,7 +141,7 @@ const AddStudentScreen = () => {
     return (
       <View style={styles.card}>
         <View style={styles.studentInfo}>
-          <Text style={styles.studentName}>{item.name}</Text>
+          <Text style={styles.studentName}>{item.name?.charAt(0).toUpperCase() + item.name?.slice(1)}</Text>
 
 
           {/* NEW: Display counselor name if available */}

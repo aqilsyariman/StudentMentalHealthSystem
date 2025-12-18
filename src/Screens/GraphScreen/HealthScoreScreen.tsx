@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   metricValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 6,
@@ -1113,8 +1113,9 @@ const styles = StyleSheet.create({
   },
   metricDate: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: '#040404ff',
     fontWeight: '500',
+    alignSelf: 'flex-end',
   },
   infoCard: {
     backgroundColor: '#EEF2FF',
