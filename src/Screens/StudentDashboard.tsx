@@ -26,6 +26,67 @@ import {RootStackParamList} from '../types/navigation';
 import {Image} from 'react-native';
 import {AnimatedCircularProgress} from 'react-native-circular-progress';
 
+// 1. MODIFIED HOOK: Now includes 'refetch' in the return object
+const useHealthData = (collectionName: string) => {
+  const [value, setValue] = useState<number | null>(null);
+  const [score, setScore] = useState<number | null>(null);
+  const [date, setDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // We wrap the fetch logic in useCallback so we can export it
+  const fetchData = useCallback(async () => {
+    setLoading(true); // Set loading true when refetching
+    const user = auth().currentUser;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const doc = await firestore()
+        .collection('students')
+        .doc(user.uid)
+        .collection('sensorData')
+        .doc(collectionName)
+        .get();
+
+      if (doc.exists()) {
+        const data = doc.data()?.data;
+        if (data && Object.keys(data).length > 0) {
+          const latestDate = Object.keys(data).sort().reverse()[0];
+          const readings = data[latestDate];
+
+          if (readings && readings.length > 0) {
+            const latest = readings[readings.length - 1];
+
+            setValue(latest.value);
+            setScore(latest.score);
+            setDate(latest.timestamp.toDate().toISOString());
+
+            console.log(`${collectionName} Refetched:`, latest.value);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching ${collectionName}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  }, [collectionName]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Return the fetchData function as 'refetch'
+  return {value, score, date, loading, refetch: fetchData};
+};
+
+export const useHeartRate = () => useHealthData('heartRate');
+export const useStepCount = () => useHealthData('stepCount');
+
+// ... (Keep Permissions object same as before) ...
 const permissions: HealthKitPermissions = {
   permissions: {
     read: [
@@ -57,11 +118,10 @@ type BloodPressureData = {
 };
 
 const DashboardScreen = ({navigation}: Props) => {
-  console.log('User UID:', auth().currentUser?.uid);
   const isIOS = Platform.OS === 'ios';
 
-  const [steps, setSteps] = useState<HealthDataWithScore | null>(null);
-  const [heartRate, setHeartRateState] = useState<HealthDataWithScore | null>(
+  const [_steps, setSteps] = useState<HealthDataWithScore | null>(null);
+  const [_heartRate, setHeartRateState] = useState<HealthDataWithScore | null>(
     null,
   );
   const [sleep, setSleep] = useState<{
@@ -78,103 +138,72 @@ const DashboardScreen = ({navigation}: Props) => {
   const [bp, setBP] = useState<BloodPressureData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Wellness Score States
   const [wellnessScore, setWellnessScore] = useState(0);
   const [hasCompleteData, setHasCompleteData] = useState(false);
   const [loadingWellness, setLoadingWellness] = useState(true);
 
-  const heartRateScore = heartRate?.score;
-  const stepCountScore = steps?.score;
+  // 2. DESTRUCTURE REFETCH: Get the refetch functions from the hooks
+  const {
+    value: hrValue,
+    score: hrScore,
+    date: hrDate,
+    refetch: refetchHeartRate,
+  } = useHeartRate();
+
+  const {
+    value: stepValue,
+    score: stepScore,
+    date: stepDate,
+    refetch: refetchSteps,
+  } = useStepCount();
+
   const bpScore = bp?.score;
   const sleepScore = sleep?.score;
 
-  //--------------------------------//
   const [studentName, setStudentName] = useState<string>('Loading...');
 
-  const fetchStudentName = async (currentStudentId: string) => {
+  // Wrapped in useCallback so it can be used in onRefresh safely
+  const fetchStudentName = useCallback(async (currentStudentId: string) => {
     if (!currentStudentId) {
       setStudentName('Guest');
       return;
     }
-
     try {
-      // 🚀 CORRECTED LOGIC: Fetch the document directly using the UID as the Document ID
       const studentDocument = await firestore()
         .collection('students')
-        .doc(currentStudentId) // <-- Use .doc() instead of .where()
+        .doc(currentStudentId)
         .get();
 
-      console.log('Fetching student name for UID:', currentStudentId);
-
       if (!studentDocument.exists) {
-        // <-- Check if the document exists
-        console.log(
-          'Error: No student document found for UID:',
-          currentStudentId,
-        );
         setStudentName('Unknown Student');
         return;
       }
-
-      // Access the data
       const data = studentDocument.data();
-
-      // Make sure 'data' is not undefined before accessing 'fullName'
       if (data && data.fullName) {
-        // Extract the 'fullName' field.
-        const name = data.fullName;
-
-        // Update the state.
-        setStudentName(name);
+        setStudentName(data.fullName);
       } else {
-        console.error('Error: Document exists but is missing fullName field.');
         setStudentName('Name Missing');
       }
     } catch (error) {
       console.error('Error fetching student name: ', error);
       setStudentName('Error Loading Name');
     }
-  };
-  // --- useFocusEffect to manage data loading ---
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const currentUserId = auth().currentUser?.uid;
-      // You can keep this log for development, but remove it for production
-      console.log('Logged-in User ID:', currentUserId);
-
       if (currentUserId) {
-        // Run both data fetching functions when the screen is focused
-
-        // Call the corrected function
         fetchStudentName(currentUserId);
-      } else {
-        setStudentName('Guest');
       }
-
-      return () => {
-        // Optional cleanup
-      };
-    }, []),
+    }, [fetchStudentName]),
   );
-  //-------------------------------//
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: () => auth().signOut(),
-        },
-      ],
-      {cancelable: true},
-    );
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      {text: 'Cancel', style: 'cancel'},
+      {text: 'Sign Out', style: 'destructive', onPress: () => auth().signOut()},
+    ]);
   };
 
   const handleHeartRatePress = () => {
@@ -191,11 +220,9 @@ const DashboardScreen = ({navigation}: Props) => {
     }
   };
 
-  // Fetch wellness score from Firestore
   const fetchWellnessScore = useCallback(async () => {
     const user = auth().currentUser;
     if (!user) return;
-
     try {
       const today = new Date();
       const dateKey = `${today.getFullYear()}-${String(
@@ -214,14 +241,11 @@ const DashboardScreen = ({navigation}: Props) => {
         if (data?.data && data.data[dateKey]) {
           const todayScore = data.data[dateKey];
           setWellnessScore(todayScore.finalScore || 0);
-
-          // Check if all scores are available
           const hasAllScores =
             todayScore.sleepScore !== null &&
             todayScore.stepsScore !== null &&
             todayScore.heartRateScore !== null &&
             todayScore.bloodPressureScore !== null;
-
           setHasCompleteData(hasAllScores);
         } else {
           setWellnessScore(0);
@@ -235,74 +259,67 @@ const DashboardScreen = ({navigation}: Props) => {
     }
   }, []);
 
-  // Extract health data fetching into a reusable function
   const fetchHealthData = useCallback(() => {
     if (!isIOS) return;
-
-    getDailyStepCount((data: HealthDataWithScore) => {
-      if (data && data.value !== null) {
-        setSteps(data);
-      } else {
-        setSteps(null);
-      }
-    });
-
-    getHeartRate((data: HealthDataWithScore) => {
-      if (data && data.value !== null) {
-        setHeartRateState(data);
-      } else {
-        setHeartRateState(null);
-      }
-    });
-
-    getBloodPressure((data: BloodPressureData) => {
-      if (data && data.sys !== null && data.dia !== null) {
-        setBP(data);
-      } else {
-        setBP(null);
-      }
-    });
-
+    getDailyStepCount(data => setSteps(data || null));
+    getHeartRate(data => setHeartRateState(data || null));
+    getBloodPressure(data => setBP(data || null));
     getSleepData(setSleep);
     getHeightWeightAndBMI(setHW);
   }, [isIOS]);
 
-  // Pull-to-refresh handler
-  const onRefresh = useCallback(() => {
+  // 3. UPDATE ONREFRESH: Call the refetch functions here
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setLoadingWellness(true);
+    const userId = auth().currentUser?.uid;
 
-    AppleHealthKit.initHealthKit(permissions, err => {
-      if (err) {
-        console.error('HealthKit not initialized:', err);
-        setRefreshing(false);
-        return;
+    try {
+      // 1. Refetch Firestore Hooks
+      await Promise.all([refetchHeartRate(), refetchSteps()]);
+
+      // 2. Refetch Student Name
+      if (userId) {
+        await fetchStudentName(userId);
       }
 
-      fetchHealthData();
-      fetchWellnessScore();
+      // 3. Refetch Wellness Score
+      await fetchWellnessScore();
 
+      // 4. Refetch Apple Health Kit Data (if iOS)
+      if (isIOS) {
+        AppleHealthKit.initHealthKit(permissions, err => {
+          if (!err) {
+            fetchHealthData();
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      // Small timeout to ensure the spinner shows for a moment if data loads too fast
       setTimeout(() => {
         setRefreshing(false);
       }, 500);
-    });
-  }, [fetchHealthData, fetchWellnessScore]);
+    }
+  }, [
+    refetchHeartRate,
+    refetchSteps,
+    fetchWellnessScore,
+    fetchHealthData,
+    fetchStudentName,
+    isIOS,
+  ]);
 
   useEffect(() => {
     if (!isIOS) return;
-
     AppleHealthKit.initHealthKit(permissions, err => {
-      if (err) {
-        console.error('HealthKit not initialized:', err);
-        return;
-      }
-
-      fetchHealthData();
+      if (!err) fetchHealthData();
     });
-
     fetchWellnessScore();
   }, [isIOS, fetchHealthData, fetchWellnessScore]);
 
+  // ... (Helper functions like formatDate, getSleepQuality remain the same) ...
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
@@ -418,7 +435,7 @@ const DashboardScreen = ({navigation}: Props) => {
           </TouchableOpacity>
         </View>
 
-        {/* Wellness Score Card */}
+        {/* ... Rest of your UI (Cards, etc) remains exactly the same ... */}
         <TouchableOpacity
           style={styles.wellnessCard}
           onPress={() => navigation.navigate('HealthScoreScreen')}
@@ -447,19 +464,17 @@ const DashboardScreen = ({navigation}: Props) => {
             </View>
           ) : (
             <View style={styles.wellnessScoreContainer}>
-              {/* Add a soft outer shadow container */}
               <View style={styles.shadowWrapper}>
                 <AnimatedCircularProgress
-                  size={200} // Slightly larger for better impact
-                  width={12} // Thinner stroke looks more modern/elegant
-                  backgroundWidth={8} // Thinner background track creates depth
+                  size={200}
+                  width={12}
+                  backgroundWidth={8}
                   fill={wellnessScore}
                   tintColor={getWellnessScoreColor(wellnessScore)}
-                  backgroundColor="rgba(229, 231, 235, 0.5)" // Semi-transparent track
+                  backgroundColor="rgba(229, 231, 235, 0.5)"
                   rotation={0}
                   lineCap="round"
-                  duration={1500} // Smooth entry animation
-                >
+                  duration={1500}>
                   {() => (
                     <View style={styles.wellnessScoreTextInner}>
                       <Text style={styles.wellnessScoreValue}>
@@ -493,11 +508,7 @@ const DashboardScreen = ({navigation}: Props) => {
         {/* Full Width Stats Cards */}
         <QuickStatCard
           title="Steps"
-          value={
-            steps?.value !== null && steps?.value !== undefined
-              ? steps.value.toLocaleString()
-              : '---'
-          }
+          value={stepValue?.toString() || '---'}
           icon={
             <Image
               source={require('../Assets/burn.png')}
@@ -506,8 +517,8 @@ const DashboardScreen = ({navigation}: Props) => {
             />
           }
           color="#8B5CF6"
-          score={stepCountScore}
-          date={steps?.date}
+          score={stepScore}
+          date={stepDate}
           formatDate={formatDate}
           onPress={handleStepsPress}
           titleColor="#e6602cff"
@@ -515,8 +526,7 @@ const DashboardScreen = ({navigation}: Props) => {
 
         <QuickStatCard
           title="Heart Rate"
-          value={heartRate?.value ? `${heartRate.value}` : '---'}
-          unit={heartRate?.value ? 'BPM' : ''}
+          value={hrValue?.toString() || '--'}
           icon={
             <Image
               source={require('../Assets/heart-rate.png')}
@@ -525,8 +535,8 @@ const DashboardScreen = ({navigation}: Props) => {
             />
           }
           color="#EF4444"
-          score={heartRateScore}
-          date={heartRate?.date}
+          score={hrScore}
+          date={hrDate}
           formatDate={formatDate}
           onPress={handleHeartRatePress}
           titleColor="#EF4444"
@@ -623,7 +633,6 @@ const DashboardScreen = ({navigation}: Props) => {
           </View>
         </TouchableOpacity>
 
-        {/* Main Health Cards */}
         <DetailCard
           title="Blood Pressure"
           icon={
@@ -683,7 +692,6 @@ const DashboardScreen = ({navigation}: Props) => {
           )}
         </DetailCard>
 
-        {/* Navigation Button */}
         <TouchableOpacity
           style={styles.detailsButton}
           onPress={() => navigation.navigate('HealthScoreScreen')}>
@@ -707,7 +715,7 @@ const DashboardScreen = ({navigation}: Props) => {
   );
 };
 
-// Component definitions...
+// ... (Rest of your component definitions like QuickStatCard, DetailCard, etc. remain unchanged) ...
 const QuickStatCard = ({
   title,
   value,
@@ -983,7 +991,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#92400E',
     marginBottom: 4,
-
   },
   wellnessIncompleteText: {
     fontSize: 13,
