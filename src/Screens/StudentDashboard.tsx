@@ -86,6 +86,123 @@ const useHealthData = (collectionName: string) => {
 export const useHeartRate = () => useHealthData('heartRate');
 export const useStepCount = () => useHealthData('stepCount');
 
+// ... existing useHealthData hook ...
+
+// 1. ADD THIS NEW HOOK
+const useDepressionRisk = () => {
+  const [level, setLevel] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
+  const [date, setDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const user = auth().currentUser;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const doc = await firestore()
+        .collection('students')
+        .doc(user.uid)
+        .collection('questionnaire') // Different collection than sensorData
+        .doc('depressionRisk')
+        .get();
+
+      if (doc.exists()) {
+        const data = doc.data()?.data;
+        if (data && Object.keys(data).length > 0) {
+          // Get latest date key
+          const latestDate = Object.keys(data).sort().reverse()[0];
+          const readings = data[latestDate];
+
+          if (readings && readings.length > 0) {
+            // Get the last item in the array for that day
+            const latest = readings[readings.length - 1];
+
+            setLevel(latest.level); // e.g., "Mild", "Severe"
+            setScore(latest.score); // e.g., 5, 18
+            setDate(
+              latest.timestamp?.toDate
+                ? latest.timestamp.toDate().toISOString()
+                : new Date().toISOString(),
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Depression Risk:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return {level, score, date, loading, refetch: fetchData};
+};
+
+const useAnxietyRisk = () => {
+  const [level, setLevel] = useState<string | null>(null);
+  const [score, setScore] = useState<number | null>(null);
+  const [date, setDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const user = auth().currentUser;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const doc = await firestore()
+        .collection('students')
+        .doc(user.uid)
+        .collection('questionnaire')
+        .doc('anxietyRisk') // <--- Targeted Document
+        .get();
+
+      if (doc.exists()) {
+        const data = doc.data()?.data;
+        if (data && Object.keys(data).length > 0) {
+          // Get latest date key
+          const latestDate = Object.keys(data).sort().reverse()[0];
+          const readings = data[latestDate];
+
+          if (readings && readings.length > 0) {
+            // Get the last item in the array for that day
+            const latest = readings[readings.length - 1];
+
+            setLevel(latest.level);
+            setScore(latest.score);
+            setDate(
+              latest.timestamp?.toDate
+                ? latest.timestamp.toDate().toISOString()
+                : new Date().toISOString(),
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Anxiety Risk:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return {level, score, date, loading, refetch: fetchData};
+};
+
 // ... (Keep Permissions object same as before) ...
 const permissions: HealthKitPermissions = {
   permissions: {
@@ -135,6 +252,20 @@ const DashboardScreen = ({navigation}: Props) => {
     bmi: number | null;
     date: string | null;
   } | null>(null);
+
+  const {
+    level: depLevel,
+    score: depScore,
+    date: depDate,
+    refetch: refetchDepression,
+  } = useDepressionRisk();
+  const {
+    level: anxLevel,
+    score: anxScore,
+    date: anxDate,
+    refetch: refetchAnxiety,
+  } = useAnxietyRisk();
+
   const [bp, setBP] = useState<BloodPressureData | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -276,7 +407,12 @@ const DashboardScreen = ({navigation}: Props) => {
 
     try {
       // 1. Refetch Firestore Hooks
-      await Promise.all([refetchHeartRate(), refetchSteps()]);
+      await Promise.all([
+        refetchHeartRate(),
+        refetchSteps(),
+        refetchDepression(),
+        refetchAnxiety(),
+      ]);
 
       // 2. Refetch Student Name
       if (userId) {
@@ -305,9 +441,11 @@ const DashboardScreen = ({navigation}: Props) => {
   }, [
     refetchHeartRate,
     refetchSteps,
+    refetchDepression,
     fetchWellnessScore,
     fetchHealthData,
     fetchStudentName,
+    refetchAnxiety,
     isIOS,
   ]);
 
@@ -388,6 +526,23 @@ const DashboardScreen = ({navigation}: Props) => {
     if (score >= 60) return 'Good';
     if (score >= 40) return 'Fair';
     return 'Needs Improvement';
+  };
+
+  // PHQ-9 Logic: Lower score = Better (Green)
+  const getDepressionScoreColor = (score: number | null) => {
+    if (score === null || score === undefined) return '#9CA3AF'; // Gray for no data
+    if (score <= 4) return '#10B981'; // Minimal Risk (Green)
+    if (score <= 9) return '#F59E0B'; // Mild Risk (Yellow)
+    if (score <= 14) return '#F97316'; // Moderate Risk (Orange)
+    return '#EF4444'; // Severe Risk (Red)
+  };
+  // GAD-7 Logic: Lower score = Better (Green)
+  const getAnxietyScoreColor = (score: number | null) => {
+    if (score === null || score === undefined) return '#9CA3AF'; // Gray for no data
+    if (score <= 4) return '#10B981';     // Minimal Anxiety (Green)
+    if (score <= 9) return '#F59E0B';     // Mild Anxiety (Yellow)
+    if (score <= 14) return '#F97316';    // Moderate Anxiety (Orange)
+    return '#EF4444';                     // Severe Anxiety (Red)
   };
 
   return (
@@ -504,7 +659,44 @@ const DashboardScreen = ({navigation}: Props) => {
             <Text style={styles.wellnessArrow}>→</Text>
           </View>
         </TouchableOpacity>
-
+        <QuickStatCard
+          title="Depression Risk"
+          value={depLevel || 'No Data'} 
+          unit={''}
+          icon={
+            <Image
+              source={require('../Assets/think.png')}
+              style={{width: 35, height: 35, marginBottom: -10}}
+              resizeMode="contain"
+            />
+          }
+          color="#1ae5be" 
+          score={depScore !== null ? `Score : ${depScore}` : null}
+          overrideColor={getDepressionScoreColor(depScore)}
+          date={depDate}
+          formatDate={formatDate}
+          onPress={() => navigation.navigate('DepressionRisk')}
+          titleColor="#14aa8cff"
+        />
+        <QuickStatCard
+          title="Anxiety Risk"
+          value={anxLevel || 'No Data'} 
+          unit={''}
+          icon={
+            <Image
+              source={require('../Assets/anxiety.png')}
+              style={{width: 35, height: 35, marginBottom: -10}}
+              resizeMode="contain"
+            />
+          }
+          color="#a4c9ff" 
+          score={anxScore !== null ? `Score : ${anxScore}` : null}
+          overrideColor={getAnxietyScoreColor(anxScore)}
+          date={anxDate}
+          formatDate={formatDate}
+          onPress={() => navigation.navigate('AnxietyRisk')}
+          titleColor="#4671c6"
+        />
         {/* Full Width Stats Cards */}
         <QuickStatCard
           title="Steps"
@@ -694,7 +886,7 @@ const DashboardScreen = ({navigation}: Props) => {
 
         <TouchableOpacity
           style={styles.detailsButton}
-          onPress={() => navigation.navigate('HealthScoreScreen')}>
+          onPress={() => navigation.navigate('DepressionRisk')}>
           <Text style={styles.detailsButtonText}>View Detailed Analytics</Text>
           <Text style={styles.detailsArrow}>→</Text>
         </TouchableOpacity>
@@ -727,42 +919,60 @@ const QuickStatCard = ({
   formatDate,
   onPress,
   titleColor,
+  overrideColor, // <--- New Prop
 }: {
   title: string;
   value: string;
   unit?: string;
   icon?: React.ReactNode;
   color: string;
-  score?: number | null;
+  score?: number | string | null; // <--- Now accepts string
   date?: string | null;
   formatDate?: (dateString: string) => string;
   onPress?: () => void;
   titleColor?: string;
+  overrideColor?: string; // <--- New Type
 }) => {
-  const getScoreColor = (s: number | null | undefined) => {
-    if (s === null || s === undefined) return '#9CA3AF';
-    if (s >= 80) return '#10B981';
-    if (s >= 60) return '#F59E0B';
-    if (s >= 40) return '#F97316';
-    return '#EF4444';
+  // Default color logic (Standard 0-100% scale)
+  const getScoreColor = (s: number | string | null | undefined) => {
+    if (s === null || s === undefined) return '#9CA3AF'; // Gray
+
+    let numericScore = 0;
+
+    if (typeof s === 'number') {
+      numericScore = s;
+    } else if (typeof s === 'string') {
+      // Extract first number found in string (e.g. "Score: 85" -> 85)
+      const match = s.match(/\d+/);
+      numericScore = match ? parseInt(match[0], 10) : 0;
+    }
+
+    if (numericScore >= 80) return '#10B981'; // Green
+    if (numericScore >= 60) return '#F59E0B'; // Yellow
+    if (numericScore >= 40) return '#F97316'; // Orange
+    return '#EF4444'; // Red
   };
+
+  // Decide final color: Use override if provided, else calculate it
+  const finalScoreColor = overrideColor || getScoreColor(score);
 
   const CardContent = (
     <View style={styles.quickStatCard}>
+      {/* Only show the top-right indicator if score exists */}
       {score !== null && score !== undefined && (
         <View
           style={[
             styles.scoreIndicatorTopRight,
-            {backgroundColor: getScoreColor(score) + '20'},
+            {backgroundColor: finalScoreColor + '20'},
           ]}>
-          <View
-            style={[styles.scoreDot, {backgroundColor: getScoreColor(score)}]}
-          />
-          <Text style={[styles.scoreText, {color: getScoreColor(score)}]}>
-            {score}%
+          <View style={[styles.scoreDot, {backgroundColor: finalScoreColor}]} />
+          <Text style={[styles.scoreText, {color: finalScoreColor}]}>
+            {/* If score is a number, add %, otherwise show text */}
+            {typeof score === 'number' ? `${score}%` : score}
           </Text>
         </View>
       )}
+
       <View style={styles.quickStatContent}>
         <View style={[styles.iconBadge, {backgroundColor: color + '15'}]}>
           <Text style={styles.iconEmoji}>{icon}</Text>

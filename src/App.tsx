@@ -10,7 +10,8 @@ import LoginPage from './Screens/LoginPage';
 import RoleSelection from './Screens/RoleSelection';
 import StudentDashboard from './Screens/StudentDashboard';
 import CounselorDashboard from './Screens/CounselorDashboard';
-import DetailsScreen from './Screens/Details';
+import DepressionRisk from './Screens/DepressionRisk';
+import AnxietyRisk from './Screens/AnxietyRisk';
 import ListStudent from './Screens/ListStudent';
 import StudentDetail from './Screens/StudentDetail';
 import AddStudentScreen from './Screens/AddStudentScreen';
@@ -119,9 +120,31 @@ const App = () => {
               component={StudentDashboard}
             />
             <Stack.Screen
-              options={{headerShown: true}}
-              name="Details"
-              component={DetailsScreen}
+              options={{
+                headerShown: true,
+                title: 'Depression Risk',
+                headerStyle: {
+                  backgroundColor: '#E0F7FA', // Your color here
+                },
+              }}
+              name="DepressionRisk"
+              component={DepressionRisk}
+            />
+            <Stack.Screen
+              options={{
+                headerShown: true,
+                title: 'Anxiety Risk',
+                headerStyle: {
+                  backgroundColor: '#DBEAFE', // Light Cyan Background
+                },
+                // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
+                headerTintColor: '#1E40AF',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+              name="AnxietyRisk"
+              component={AnxietyRisk}
             />
             <Stack.Screen
               options={{
@@ -139,7 +162,13 @@ const App = () => {
               component={HeartRateGraph}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Steps Count Graph'}}
+              options={{
+                headerShown: true,
+                title: 'Steps Count Graph',
+                headerStyle: {
+                  backgroundColor: '#fff5f0', // Your color here
+                },
+              }}
               name="StepsGraph"
               component={StepsGraph}
             />

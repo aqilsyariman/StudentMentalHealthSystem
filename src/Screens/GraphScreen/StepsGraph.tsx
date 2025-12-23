@@ -239,7 +239,7 @@ const StepsGraph = ({route}: StudentDetailProps) => {
           <Text style={styles.studentEmail}>{student?.email}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Step Count Monitor</Text>
+     
 
         {/* Current Step Count Card */}
         <View style={styles.card}>
@@ -335,7 +335,10 @@ const StepsGraph = ({route}: StudentDetailProps) => {
 };
 
 const styles = StyleSheet.create({
-  fullContainer: {flex: 1, backgroundColor: SOFT_BURN},
+  fullContainer: {
+    flex: 1,
+    backgroundColor: SOFT_BURN,
+  },
   scrollContainer: {padding: 20, paddingBottom: 80},
   centerContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
   loadingText: {

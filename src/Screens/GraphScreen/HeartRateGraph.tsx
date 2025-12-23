@@ -258,8 +258,6 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
           <Text style={styles.studentEmail}>{student?.email}</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>❤️ Heart Rate Monitor</Text>
-
         {/* Current Heart Rate Card */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
