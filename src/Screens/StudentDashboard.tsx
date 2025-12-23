@@ -539,10 +539,10 @@ const DashboardScreen = ({navigation}: Props) => {
   // GAD-7 Logic: Lower score = Better (Green)
   const getAnxietyScoreColor = (score: number | null) => {
     if (score === null || score === undefined) return '#9CA3AF'; // Gray for no data
-    if (score <= 4) return '#10B981';     // Minimal Anxiety (Green)
-    if (score <= 9) return '#F59E0B';     // Mild Anxiety (Yellow)
-    if (score <= 14) return '#F97316';    // Moderate Anxiety (Orange)
-    return '#EF4444';                     // Severe Anxiety (Red)
+    if (score <= 4) return '#10B981'; // Minimal Anxiety (Green)
+    if (score <= 9) return '#F59E0B'; // Mild Anxiety (Yellow)
+    if (score <= 14) return '#F97316'; // Moderate Anxiety (Orange)
+    return '#EF4444'; // Severe Anxiety (Red)
   };
 
   return (
@@ -659,9 +659,10 @@ const DashboardScreen = ({navigation}: Props) => {
             <Text style={styles.wellnessArrow}>→</Text>
           </View>
         </TouchableOpacity>
+        <SectionHeader title="Mood & Emotions" />
         <QuickStatCard
           title="Depression Risk"
-          value={depLevel || 'No Data'} 
+          value={depLevel || 'No Data'}
           unit={''}
           icon={
             <Image
@@ -670,7 +671,7 @@ const DashboardScreen = ({navigation}: Props) => {
               resizeMode="contain"
             />
           }
-          color="#1ae5be" 
+          color="#1ae5be"
           score={depScore !== null ? `Score : ${depScore}` : null}
           overrideColor={getDepressionScoreColor(depScore)}
           date={depDate}
@@ -680,7 +681,7 @@ const DashboardScreen = ({navigation}: Props) => {
         />
         <QuickStatCard
           title="Anxiety Risk"
-          value={anxLevel || 'No Data'} 
+          value={anxLevel || 'No Data'}
           unit={''}
           icon={
             <Image
@@ -689,7 +690,7 @@ const DashboardScreen = ({navigation}: Props) => {
               resizeMode="contain"
             />
           }
-          color="#a4c9ff" 
+          color="#a4c9ff"
           score={anxScore !== null ? `Score : ${anxScore}` : null}
           overrideColor={getAnxietyScoreColor(anxScore)}
           date={anxDate}
@@ -698,6 +699,7 @@ const DashboardScreen = ({navigation}: Props) => {
           titleColor="#4671c6"
         />
         {/* Full Width Stats Cards */}
+        <SectionHeader title="Physical Activity" />
         <QuickStatCard
           title="Steps"
           value={stepValue?.toString() || '---'}
@@ -715,7 +717,6 @@ const DashboardScreen = ({navigation}: Props) => {
           onPress={handleStepsPress}
           titleColor="#e6602cff"
         />
-
         <QuickStatCard
           title="Heart Rate"
           value={hrValue?.toString() || '--'}
@@ -733,6 +734,8 @@ const DashboardScreen = ({navigation}: Props) => {
           onPress={handleHeartRatePress}
           titleColor="#EF4444"
         />
+
+        <SectionHeader title="Sleep & Vital Signs" />
 
         <TouchableOpacity
           style={styles.detailCard}
@@ -824,7 +827,6 @@ const DashboardScreen = ({navigation}: Props) => {
             )}
           </View>
         </TouchableOpacity>
-
         <DetailCard
           title="Blood Pressure"
           icon={
@@ -853,7 +855,7 @@ const DashboardScreen = ({navigation}: Props) => {
             <Text style={styles.timestamp}>{formatDate(bp.date)}</Text>
           )}
         </DetailCard>
-
+        <SectionHeader title="Physical Stats" />
         <DetailCard
           title="Body Metrics"
           icon={
@@ -1085,6 +1087,12 @@ const MetricItem = ({
       style={[styles.metricValue, highlight && styles.metricValueHighlight]}>
       {value}
     </Text>
+  </View>
+);
+
+const SectionHeader = ({title}: {title: string}) => (
+  <View style={styles.sectionHeaderContainer}>
+    <Text style={styles.sectionHeaderText}>{title}</Text>
   </View>
 );
 
@@ -1652,6 +1660,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
+  },
+  // ... existing styles
+  sectionHeaderContainer: {
+    marginTop: 24, // Space from the previous card
+    marginBottom: 12, // Space to the next card
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#6B7280', // Cool gray (subtitle color)
+    textTransform: 'uppercase',
+    letterSpacing: 1.2, // Makes it look like a proper section header
   },
 });
 

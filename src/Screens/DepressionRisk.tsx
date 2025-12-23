@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Dimensions,
+  Image
 } from 'react-native';
 import {LinearGradient} from 'react-native-linear-gradient';
 import firestore from '@react-native-firebase/firestore';
@@ -388,13 +389,6 @@ export default function DepressionQuestionnaire() {
 
     return (
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>Mental Health Log</Text>
-          <Text style={styles.historySubtitle}>
-            Track your well-being over time
-          </Text>
-        </View>
-
         {/* Start Assessment Button */}
         <TouchableOpacity
           style={styles.startAssessmentButton}
@@ -427,7 +421,13 @@ export default function DepressionQuestionnaire() {
             <View style={styles.sensorCardContainer}>
               <View
                 style={[styles.iconContainer, {backgroundColor: '#E0F7FA'}]}>
-                <Text style={{fontSize: 32}}>🧠</Text>
+                <Text style={{fontSize: 32}}>
+                  <Image
+                    source={require('../Assets/think.png')}
+                    style={{width: 50, height: 50, marginBottom: -5}}
+                    resizeMode="contain"
+                  />
+                </Text>
               </View>
               <View style={styles.sensorTextContainer}>
                 <Text style={styles.sensorValue}>

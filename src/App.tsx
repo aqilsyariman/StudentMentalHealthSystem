@@ -126,6 +126,7 @@ const App = () => {
                 headerStyle: {
                   backgroundColor: '#E0F7FA', // Your color here
                 },
+                headerTintColor: '#0f856d', // Text/icon color
               }}
               name="DepressionRisk"
               component={DepressionRisk}
@@ -201,12 +202,18 @@ const App = () => {
               component={CounselorDashboard}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'List Student'}}
+              options={{headerShown: true, title: 'My Student'}}
               name="ListStudent"
               component={ListStudent}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Student Details'}}
+              options={{
+                headerShown: true,
+                title: 'Student Details',
+                headerStyle: {
+                  backgroundColor: '#F0F2F5', // Your color here
+                },
+              }}
               name="StudentDetail"
               component={StudentDetail}
             />
@@ -216,12 +223,30 @@ const App = () => {
               component={AddStudentScreen}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Heart Rate Graph'}}
+              options={{
+                headerShown: true,
+                title: 'Heart Rate',
+                headerStyle: {
+                  backgroundColor: '#fff0f0',
+                },
+                headerTintColor: '#393838ff',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+                // 👇 ADD THIS LINE
+                headerBackTitle: 'Back',
+              }}
               name="HeartRateGraph"
               component={HeartRateGraph}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Steps Count Graph'}}
+              options={{
+                headerShown: true,
+                title: 'Steps Count Graph',
+                headerStyle: {
+                  backgroundColor: '#fff5f0', // Your color here
+                },
+              }}
               name="StepsGraph"
               component={StepsGraph}
             />
