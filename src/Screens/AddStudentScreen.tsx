@@ -1,309 +1,439 @@
-/* eslint-disable react/no-unstable-nested-components */
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   TextInput,
-  Button,
-  FlatList,
+  SectionList,
   ActivityIndicator,
   StyleSheet,
   Alert,
   TouchableOpacity,
+  StatusBar,
+  SafeAreaView,
+  RefreshControl,
+  Image, // Added Image import
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
+import Svg, { Path, Circle } from 'react-native-svg';
 
-// --- UPDATED TYPE: Added counselorName ---
+// --- TYPES ---
 type Student = {
   id: string;
   name: string;
   email: string;
   counselorId: string | null;
-  counselorName?: string; // NEW: Optional counselor name
+  counselorName?: string;
+  avatar: string; // NEW: Added avatar field
 };
+
+// --- ICONS ---
+const SearchIcon = ({ color = '#9CA3AF' }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx={11} cy={11} r={8} />
+    <Path d="M21 21l-4.35-4.35" />
+  </Svg>
+);
+
+const UserPlusIcon = ({ color = '#FFF' }) => (
+  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+    <Circle cx={8.5} cy={7} r={4} />
+    <Path d="M20 8v6M23 11h-6" />
+  </Svg>
+);
+
+const CheckIcon = ({ color = '#10B981' }) => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M20 6L9 17l-5-5" />
+  </Svg>
+);
 
 const AddStudentScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [sections, setSections] = useState<{ title: string; data: Student[] }[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // --- NEW: Helper function to fetch counselor name ---
+  // --- HELPER: Fetch Counselor Name ---
   const getCounselorName = async (counselorId: string): Promise<string> => {
     try {
-      const counselorDoc = await firestore()
-        .collection('counselors')
-        .doc(counselorId)
-        .get();
+      const currentUid = auth().currentUser?.uid;
+      if (counselorId === currentUid) return 'You';
 
+      const counselorDoc = await firestore().collection('counselors').doc(counselorId).get();
       if (counselorDoc.exists()) {
         const data = counselorDoc.data();
         return data?.fullName || data?.name || 'Unknown Counselor';
       }
-      return 'Unknown Counselor';
+      return 'Unknown';
     } catch (error) {
-      console.error('Error fetching counselor:', error);
-      return 'Unknown Counselor';
+      return 'Unknown';
     }
   };
 
-  // --- Search Logic (Diagnostic Test Version - searches ALL students) ---
-  const handleSearch = async () => {
-    if (searchQuery.trim() === '') {
-      Alert.alert('Please enter a name to search.');
-      return;
-    }
-    setLoading(true);
-    setSearchResults([]);
-
+  // --- FETCH STUDENTS ---
+  const fetchStudents = useCallback(async () => {
     try {
-      const normalizedQuery = searchQuery.toLowerCase();
       const studentsRef = firestore().collection('students');
+      const snapshot = await studentsRef.orderBy('fullName').limit(100).get();
 
-      const q = await studentsRef
-        .where('fullName', '>=', normalizedQuery)
-        .where('fullName', '<=', normalizedQuery + '\uf8ff')
-        .get();
+      const studentList: Student[] = [];
 
-      const students: Student[] = [];
-
-      // Fetch all students first
-      for (const doc of q.docs) {
+      for (const doc of snapshot.docs) {
         const data = doc.data();
         const counselorId = data.counselorId || null;
-
-        // Fetch counselor name if counselorId exists
         let counselorName;
+
         if (counselorId) {
           counselorName = await getCounselorName(counselorId);
         }
 
-        students.push({
+        // NEW: Avatar Logic (Photo URL or Fallback based on Email)
+        const avatar = data.photoURL || `https://i.pravatar.cc/150?u=${data.email}`;
+
+        studentList.push({
           id: doc.id,
-          name: data.fullName || 'No Name',
+          name: data.fullName || 'Unnamed Student',
           email: data.email || 'No Email',
           counselorId: counselorId,
-          counselorName: counselorName, // NEW: Include counselor name
+          counselorName: counselorName,
+          avatar: avatar,
         });
       }
 
-      setSearchResults(students);
-      if (students.length === 0) {
-        Alert.alert('No Results', `No student found starting with "${searchQuery}".`);
-      }
-
+      setAllStudents(studentList);
+      // We removed organizeSections here to rely on the useEffect below
     } catch (error) {
-      console.error('Error during search: ', error);
-      Alert.alert('Fatal Error', 'The index or permissions are fundamentally broken.');
+      console.error('Error fetching students:', error);
+      Alert.alert('Error', 'Could not load student list.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }, []);
+
+  // --- ORGANIZE SECTIONS ---
+  const organizeSections = (students: Student[], query: string) => {
+    let filtered = students;
+    if (query.trim() !== '') {
+      const lowerQuery = query.toLowerCase();
+      filtered = students.filter(student =>
+        student.name.toLowerCase().includes(lowerQuery) ||
+        student.email.toLowerCase().includes(lowerQuery)
+      );
+    }
+
+    const available = filtered.filter(s => !s.counselorId);
+    const assigned = filtered.filter(s => s.counselorId);
+
+    const newSections = [];
+    if (available.length > 0) newSections.push({ title: 'Available Students', data: available });
+    if (assigned.length > 0) newSections.push({ title: 'Already Assigned', data: assigned });
+
+    setSections(newSections);
   };
 
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
+
+  // --- UPDATE LIST ON SEARCH ---
+  useEffect(() => {
+    organizeSections(allStudents, searchQuery);
+  }, [searchQuery, allStudents]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchStudents();
+  };
+
+  // --- ADD STUDENT ---
   const handleAddStudent = async (studentId: string) => {
     const currentCounselorId = auth().currentUser?.uid;
-
-    if (!currentCounselorId) {
-      Alert.alert('Error', 'You must be logged in as a counselor to add students.');
-      return;
-    }
+    if (!currentCounselorId) return;
 
     try {
-      const studentRef = firestore().collection('students').doc(studentId);
-
-      await studentRef.update({
+      // Optimistic Update
+      const updatedList = allStudents.map(s =>
+        s.id === studentId ? { ...s, counselorId: currentCounselorId, counselorName: 'You' } : s
+      );
+      setAllStudents(updatedList);
+      
+      await firestore().collection('students').doc(studentId).update({
         counselorId: currentCounselorId,
       });
 
-      // Fetch the current counselor's name
-      const currentCounselorName = await getCounselorName(currentCounselorId);
-
-      // Update the UI immediately without re-searching
-      setSearchResults(prevResults => prevResults.map(student =>
-        student.id === studentId
-          ? { ...student, counselorId: currentCounselorId, counselorName: currentCounselorName }
-          : student
-      ));
-
       Alert.alert('Success', 'Student added to your list.');
-
     } catch (error) {
-      console.error('Error adding student: ', error);
-      Alert.alert('Error', 'Failed to add student. Check security rules.');
+      console.error('Error adding student:', error);
+      Alert.alert('Error', 'Failed to update database.');
+      fetchStudents();
     }
   };
 
-  // --- Conditional Rendering Function ---
+  // --- RENDER ITEM ---
   const renderStudent = ({ item }: { item: Student }) => {
-    const isAssigned = item.counselorId && item.counselorId !== '';
+    const isAssigned = !!item.counselorId;
+    const isAssignedToMe = item.counselorName === 'You';
 
     return (
       <View style={styles.card}>
-        <View style={styles.studentInfo}>
-          <Text style={styles.studentName}>{item.name?.charAt(0).toUpperCase() + item.name?.slice(1)}</Text>
+        <View style={styles.cardContent}>
+          {/* UPDATED: Uses Image instead of Text/View */}
+          <Image 
+            source={{ uri: item.avatar }} 
+            style={styles.avatarImage} 
+          />
 
+          <View style={styles.infoContainer}>
+            <Text style={styles.studentName}>{item.name}</Text>
+            <Text style={styles.studentEmail}>{item.email}</Text>
+            {isAssigned && (
+              <View style={[styles.statusBadge, isAssignedToMe ? styles.badgeMine : styles.badgeOthers]}>
+                <Text style={[styles.statusText, isAssignedToMe ? styles.textMine : styles.textOthers]}>
+                  {isAssignedToMe ? 'Assigned to You' : `Under ${item.counselorName}`}
+                </Text>
+              </View>
+            )}
+          </View>
 
-          {/* NEW: Display counselor name if available */}
-          {item.counselorName && (
-            <Text style={styles.counselorName}>
-              Assigned under {item.counselorName}
-            </Text>
+          {!isAssigned ? (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => handleAddStudent(item.id)}
+              activeOpacity={0.7}
+            >
+              <UserPlusIcon />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.checkedContainer}>
+              {isAssignedToMe && <CheckIcon />}
+            </View>
           )}
         </View>
-
-        {isAssigned ? (
-          <View style={styles.assignedTag}>
-            <Text style={styles.assignedTagText}>Assigned</Text>
-          </View>
-        ) : (
-          <Button
-            title="Add"
-            onPress={() => handleAddStudent(item.id)}
-            color="#489448ff"
-          />
-        )}
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Add Student</Text>
-      <Text style={styles.subtitle}>Search for any student by name.</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
 
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search by student name..."
-        placeholderTextColor="#8a8a8a"
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        autoCapitalize="none"
-      />
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerSubtitle}>Add new students to your class</Text>
+      </View>
 
-      <TouchableOpacity
-        style={styles.searchButton}
-        onPress={handleSearch}
-        disabled={loading}
-      >
-        <Text style={styles.searchButtonText}>Search</Text>
-      </TouchableOpacity>
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchContainer}>
+          <SearchIcon />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+          />
+        </View>
+      </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#6f5be1ff" style={{ marginTop: 30 }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+          <Text style={styles.loadingText}>Loading students...</Text>
+        </View>
       ) : (
-        <FlatList
-          data={searchResults}
-          renderItem={renderStudent}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.id}
-          style={{ marginTop: 20 }}
+          renderItem={renderStudent}
+          renderSectionHeader={({ section: { title } }) => (
+            <Text style={styles.sectionHeader}>{title}</Text>
+          )}
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6366F1']} />
+          }
           ListEmptyComponent={() => (
-            <Text style={styles.loadingText}>No results</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No students found</Text>
+              <Text style={styles.emptyText}>Try adjusting your search terms</Text>
+            </View>
           )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#d3dbf5ff',
+    backgroundColor: '#F9FAFB',
   },
-  title: {
-    fontSize: 30,
+  headerContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 28,
     fontWeight: '800',
-    color: '#6f5be1ff',
-    letterSpacing: 1,
-    marginTop: 15,
+    color: '#111827',
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 25,
+  headerSubtitle: {
+    fontSize: 15,
+    color: '#6B7280',
+  },
+  searchWrapper: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    zIndex: 10,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
   },
   searchInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    marginBottom: 15,
+    flex: 1,
+    marginLeft: 12,
     fontSize: 16,
-    color: '#333',
-    shadowColor: '#7B68EE',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 6,
+    color: '#1F2937',
+    height: '100%',
   },
-  searchButton: {
-    backgroundColor: '#6f5be1ff',
-    paddingVertical: 15,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#7B68EE',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+  listContent: {
+    padding: 24,
+    paddingTop: 0,
   },
-  searchButtonText: {
-    color: '#FFFFFF',
+  sectionHeader: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 24,
+    marginBottom: 12,
+    letterSpacing: -0.5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
-    marginTop: 20,
-    fontSize: 16,
-    color: '#555',
-    textAlign: 'center',
+    marginTop: 12,
+    color: '#6B7280',
+    fontSize: 14,
   },
+  // --- CARD STYLES ---
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#7B68EE',
-    shadowOffset: {width: 0, height: 6},
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
+    marginBottom: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  cardContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  studentInfo: {
+  // NEW: Avatar Image Style
+  avatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E5E7EB', // Fallback gray while loading
+    marginRight: 16,
+  },
+  infoContainer: {
     flex: 1,
   },
   studentName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#111827',
   },
   studentEmail: {
     fontSize: 13,
-    color: '#777',
+    color: '#6B7280',
     marginTop: 2,
   },
-  // NEW: Style for counselor name
-  counselorName: {
-    fontSize: 12,
-    color: '#6f5be1ff',
+  // --- STATUS BADGES ---
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  badgeMine: {
+    backgroundColor: '#ECFDF5',
+  },
+  badgeOthers: {
+    backgroundColor: '#FEF2F2',
+  },
+  textMine: {
+    color: '#059669',
+  },
+  textOthers: {
+    color: '#DC2626',
+  },
+  // --- BUTTONS ---
+  addButton: {
+    backgroundColor: '#6366F1',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  checkedContainer: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9CA3AF',
     marginTop: 4,
-
-  },
-  assignedTag: {
-    backgroundColor: '#f8e3e3ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  assignedTagText: {
-    color: '#f15252ff',
-    fontWeight: 'bold',
-    fontSize: 13,
   },
 });
 

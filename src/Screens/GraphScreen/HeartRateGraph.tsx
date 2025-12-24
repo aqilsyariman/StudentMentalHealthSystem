@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import Svg, {Path} from 'react-native-svg';
 import {LineChart} from 'react-native-chart-kit';
 
 const screenWidth = Dimensions.get('window').width;
@@ -62,27 +61,27 @@ const getAllHeartRateReadings = (sensorDoc: any): HeartRateReading[] => {
   }
 
   readings.sort((a, b) => {
-    const timeA = a.timestamp.toDate ? a.timestamp.toDate().getTime() : new Date(a.timestamp).getTime();
-    const timeB = b.timestamp.toDate ? b.timestamp.toDate().getTime() : new Date(b.timestamp).getTime();
+    const timeA = a.timestamp.toDate
+      ? a.timestamp.toDate().getTime()
+      : new Date(a.timestamp).getTime();
+    const timeB = b.timestamp.toDate
+      ? b.timestamp.toDate().getTime()
+      : new Date(b.timestamp).getTime();
     return timeA - timeB;
   });
 
   return readings;
 };
 
-const HeartIcon = ({size = 50}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path
-      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-      fill="#FF6F61"
-    />
-  </Svg>
-);
 
 const HeartRateGraph = ({route}: StudentDetailProps) => {
   const [student, setStudent] = useState<Student | null>(null);
-  const [allHeartRateReadings, setAllHeartRateReadings] = useState<HeartRateReading[]>([]);
-  const [filteredReadings, setFilteredReadings] = useState<HeartRateReading[]>([]);
+  const [allHeartRateReadings, setAllHeartRateReadings] = useState<
+    HeartRateReading[]
+  >([]);
+  const [filteredReadings, setFilteredReadings] = useState<HeartRateReading[]>(
+    [],
+  );
   const [latestHeartRate, setLatestHeartRate] = useState<number | null>(null);
   const [latestTimestamp, setLatestTimestamp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -119,8 +118,12 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
         // Extract unique dates
         const dates = new Set<string>();
         allReadings.forEach(reading => {
-          const date = reading.timestamp.toDate ? reading.timestamp.toDate() : new Date(reading.timestamp);
-          const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          const date = reading.timestamp.toDate
+            ? reading.timestamp.toDate()
+            : new Date(reading.timestamp);
+          const dateStr = `${date.getFullYear()}-${String(
+            date.getMonth() + 1,
+          ).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
           dates.add(dateStr);
         });
         const sortedDates = Array.from(dates).sort().reverse();
@@ -150,8 +153,12 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
   useEffect(() => {
     if (selectedDate && allHeartRateReadings.length > 0) {
       const filtered = allHeartRateReadings.filter(reading => {
-        const date = reading.timestamp.toDate ? reading.timestamp.toDate() : new Date(reading.timestamp);
-        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const date = reading.timestamp.toDate
+          ? reading.timestamp.toDate()
+          : new Date(reading.timestamp);
+        const dateStr = `${date.getFullYear()}-${String(
+          date.getMonth() + 1,
+        ).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return dateStr === selectedDate;
       });
       setFilteredReadings(filtered);
@@ -180,7 +187,7 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
     if (isToday) return 'Today';
     if (isYesterday) return 'Yesterday';
 
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const month = date.toLocaleDateString('en-US', {month: 'short'});
     const day = date.getDate();
     return `${month} ${day}`;
   };
@@ -196,8 +203,13 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
     const labels = filteredReadings.map((reading, index) => {
       // Show every other label or all if less than 6 readings
       if (index % 2 === 0 || filteredReadings.length <= 6) {
-        const date = reading.timestamp.toDate ? reading.timestamp.toDate() : new Date(reading.timestamp);
-        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+        const date = reading.timestamp.toDate
+          ? reading.timestamp.toDate()
+          : new Date(reading.timestamp);
+        return `${date.getHours()}:${date
+          .getMinutes()
+          .toString()
+          .padStart(2, '0')}`;
       }
       return '';
     });
@@ -206,19 +218,21 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
 
     return {
       labels,
-      datasets: [{
-        data,
-        color: (opacity = 1) => `rgba(255, 111, 97, ${opacity})`,
-        strokeWidth: 3,
-      }],
+      datasets: [
+        {
+          data,
+          color: (opacity = 1) => `rgba(255, 111, 97, ${opacity})`,
+          strokeWidth: 3,
+        },
+      ],
     };
   };
 
   const getHeartRateStatus = (bpm: number | null) => {
-    if (!bpm) return { text: 'Waiting', color: '#999' };
-    if (bpm < 60) return { text: 'Low', color: '#2196F3' };
-    if (bpm >= 60 && bpm <= 100) return { text: 'Normal', color: '#4CAF50' };
-    return { text: 'High', color: '#FF9800' };
+    if (!bpm) return {text: 'Waiting', color: '#999'};
+    if (bpm < 60) return {text: 'Low', color: '#2196F3'};
+    if (bpm >= 60 && bpm <= 100) return {text: 'Normal', color: '#4CAF50'};
+    return {text: 'High', color: '#FF9800'};
   };
 
   const status = getHeartRateStatus(latestHeartRate);
@@ -262,7 +276,8 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Current Heart Rate</Text>
-            <View style={[styles.badge, {backgroundColor: status.color + '20'}]}>
+            <View
+              style={[styles.badge, {backgroundColor: status.color + '20'}]}>
               <Text style={[styles.badgeText, {color: status.color}]}>
                 {status.text}
               </Text>
@@ -270,7 +285,11 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
           </View>
           <View style={styles.sensorCardContainer}>
             <View style={styles.iconContainer}>
-              <HeartIcon size={48} />
+              <Image
+                source={require('../../Assets/heart-rate.png')}
+                style={{width: 40, height: 40}}
+                resizeMode="contain"
+              />
             </View>
             <View style={styles.sensorTextContainer}>
               <Text style={styles.sensorValue}>
@@ -287,12 +306,11 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
         {/* Date Selector - iOS Style Pills */}
         {availableDates.length > 0 && (
           <View style={styles.dateSelectorContainer}>
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dateScrollContainer}
-            >
-              {availableDates.map((date) => (
+              contentContainerStyle={styles.dateScrollContainer}>
+              {availableDates.map(date => (
                 <TouchableOpacity
                   key={date}
                   style={[
@@ -300,14 +318,12 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
                     selectedDate === date && styles.datePillSelected,
                   ]}
                   onPress={() => setSelectedDate(date)}
-                  activeOpacity={0.7}
-                >
+                  activeOpacity={0.7}>
                   <Text
                     style={[
                       styles.datePillText,
                       selectedDate === date && styles.datePillTextSelected,
-                    ]}
-                  >
+                    ]}>
                     {formatDateLabel(date)}
                   </Text>
                 </TouchableOpacity>
@@ -331,7 +347,8 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
                   backgroundGradientTo: '#ffffff',
                   decimalPlaces: 0,
                   color: (opacity = 1) => `rgba(255, 111, 97, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(100, 100, 100, ${opacity})`,
+                  labelColor: (opacity = 1) =>
+                    `rgba(100, 100, 100, ${opacity})`,
                   style: {
                     borderRadius: 16,
                   },
@@ -359,7 +376,8 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
             </View>
             <View style={styles.chartFooter}>
               <Text style={styles.chartNote}>
-                🕐 Showing {filteredReadings.length} readings for {formatDateLabel(selectedDate!)}
+                🕐 Showing {filteredReadings.length} readings for{' '}
+                {formatDateLabel(selectedDate!)}
               </Text>
               <Text style={styles.chartSubNote}>
                 Times displayed in 24-hour format
@@ -372,8 +390,12 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
           <View style={styles.card}>
             <View style={styles.noDataContainer}>
               <Text style={styles.noDataIcon}>💓</Text>
-              <Text style={styles.noDataText}>No readings for {formatDateLabel(selectedDate)}</Text>
-              <Text style={styles.noDataSubText}>Try selecting a different date</Text>
+              <Text style={styles.noDataText}>
+                No readings for {formatDateLabel(selectedDate)}
+              </Text>
+              <Text style={styles.noDataSubText}>
+                Try selecting a different date
+              </Text>
             </View>
           </View>
         )}
@@ -382,8 +404,12 @@ const HeartRateGraph = ({route}: StudentDetailProps) => {
           <View style={styles.card}>
             <View style={styles.noDataContainer}>
               <Text style={styles.noDataIcon}>💓</Text>
-              <Text style={styles.noDataText}>No heart rate history available</Text>
-              <Text style={styles.noDataSubText}>Data will appear once readings are recorded</Text>
+              <Text style={styles.noDataText}>
+                No heart rate history available
+              </Text>
+              <Text style={styles.noDataSubText}>
+                Data will appear once readings are recorded
+              </Text>
             </View>
           </View>
         )}

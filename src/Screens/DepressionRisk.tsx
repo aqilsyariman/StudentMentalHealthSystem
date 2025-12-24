@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo,useCallback} from 'react';
 import {
   View,
   Text,
@@ -9,17 +9,20 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Dimensions,
-  Image
+  Image,
 } from 'react-native';
 import {LinearGradient} from 'react-native-linear-gradient';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import {LineChart} from 'react-native-chart-kit';
+import {useRoute} from '@react-navigation/native';
 
 const SAVE_TO_FIRESTORE = true;
 const screenWidth = Dimensions.get('window').width;
 
 export default function DepressionQuestionnaire() {
+  const route = useRoute();
+  const {studentId, viewOnly} = (route.params as any) || {};
   const [view, setView] = useState<'history' | 'questionnaire' | 'result'>(
     'history',
   );
@@ -139,42 +142,54 @@ export default function DepressionQuestionnaire() {
   // --- HELPERS ---
 
   const getDepressionScoreColor = (score: number | null) => {
-    if (score === null || score === undefined) return '#9CA3AF';
-    if (score <= 4) return '#10B981'; // Green
-    if (score <= 9) return '#F59E0B'; // Yellow
-    if (score <= 14) return '#F97316'; // Orange
+    if (score === null || score === undefined) {
+      return '#9CA3AF';
+    }
+    if (score <= 4) {
+      return '#10B981';
+    } // Green
+    if (score <= 9) {
+      return '#F59E0B';
+    } // Yellow
+    if (score <= 14) {
+      return '#F97316';
+    } // Orange
     return '#EF4444'; // Red
   };
 
   const getResultInfo = (score: number) => {
-    if (score <= 4)
+    if (score <= 4) {
       return {
         level: 'Minimal',
         colors: ['#34D399', '#14B8A6'],
         message: 'Minimal depression symptoms.',
         recommendation: 'Keep practicing self-care.',
       };
-    if (score <= 9)
+    }
+    if (score <= 9) {
       return {
         level: 'Mild',
         colors: ['#FBBF24', '#F59E0B'],
         message: 'Mild depression symptoms.',
         recommendation: 'Consider talking to a friend or support.',
       };
-    if (score <= 14)
+    }
+    if (score <= 14) {
       return {
         level: 'Moderate',
         colors: ['#FB923C', '#EF4444'],
         message: 'Moderate depression symptoms.',
         recommendation: 'Professional support recommended.',
       };
-    if (score <= 19)
+    }
+    if (score <= 19) {
       return {
         level: 'Moderately Severe',
         colors: ['#EF4444', '#F43F5E'],
         message: 'Moderately severe symptoms.',
         recommendation: 'Consult a professional soon.',
       };
+    }
     return {
       level: 'Severe',
       colors: ['#DC2626', '#E11D48'],
@@ -189,15 +204,21 @@ export default function DepressionQuestionnaire() {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
     return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
   };
 
   // --- GRAPH DATA PREPARATION ---
 
   const filteredResults = useMemo(() => {
-    if (!selectedDate || pastResults.length === 0) return [];
+    if (!selectedDate || pastResults.length === 0) {
+      return [];
+    }
 
     return pastResults
       .filter(result => {
@@ -281,7 +302,9 @@ export default function DepressionQuestionnaire() {
 
   const saveToFirestore = async (finalAnswers: Record<number, number>) => {
     const currentUser = auth().currentUser;
-    if (!SAVE_TO_FIRESTORE || !currentUser) return;
+    if (!SAVE_TO_FIRESTORE || !currentUser) {
+      return;
+    }
 
     try {
       const score = Object.values(finalAnswers).reduce(
@@ -325,15 +348,19 @@ export default function DepressionQuestionnaire() {
     }
   };
 
-  const fetchPastResults = async () => {
+  // Wrap the function in useCallback so it doesn't change on every render
+  const fetchPastResults = useCallback(async () => {
     const currentUser = auth().currentUser;
-    if (!currentUser) return;
+    // Use the passed studentId if available, otherwise use current user
+    const targetUid = studentId || currentUser?.uid;
+
+    if (!targetUid) return;
 
     setLoadingPastResults(true);
     try {
       const doc = await firestore()
         .collection('students')
-        .doc(currentUser.uid)
+        .doc(targetUid) // Using the correct ID
         .collection('questionnaire')
         .doc('depressionRisk')
         .get();
@@ -368,11 +395,12 @@ export default function DepressionQuestionnaire() {
     } finally {
       setLoadingPastResults(false);
     }
-  };
+  }, [studentId]); // Dependent on studentId
 
+  // Now the useEffect is safe and correct
   useEffect(() => {
     fetchPastResults();
-  }, []);
+  }, [fetchPastResults]);
 
   const returnToHistory = () => setView('history');
 
@@ -390,21 +418,23 @@ export default function DepressionQuestionnaire() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Start Assessment Button */}
-        <TouchableOpacity
-          style={styles.startAssessmentButton}
-          onPress={startAssessment}
-          activeOpacity={0.8}>
-          <LinearGradient
-            colors={['#14aa8c', '#0f856d']}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}
-            style={styles.startButtonGradient}>
-            <Text style={styles.startButtonText}>+ Take New Assessment</Text>
-            <Text style={styles.startButtonSubtext}>
-              2-minute check-in (PHQ-9)
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        {!viewOnly && (
+          <TouchableOpacity
+            style={styles.startAssessmentButton}
+            onPress={startAssessment}
+            activeOpacity={0.8}>
+            <LinearGradient
+              colors={['#14aa8c', '#0f856d']}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={styles.startButtonGradient}>
+              <Text style={styles.startButtonText}>+ Take New Assessment</Text>
+              <Text style={styles.startButtonSubtext}>
+                2-minute check-in (PHQ-9)
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
 
         {/* Latest Score Card */}
         {latestResult && (

@@ -632,7 +632,7 @@ const DashboardScreen = ({navigation}: Props) => {
               activeOpacity={0.7}>
               <Image
                 source={require('../Assets/message.png')}
-                style={{width: 28, height: 28}}
+                style={{width: 35, height: 35}}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -759,7 +759,7 @@ const DashboardScreen = ({navigation}: Props) => {
               resizeMode="contain"
             />
           }
-          color="#8B5CF6"
+          color="#fdbe28"
           score={stepScore}
           date={stepDate}
           formatDate={formatDate}
@@ -769,6 +769,7 @@ const DashboardScreen = ({navigation}: Props) => {
         <QuickStatCard
           title="Heart Rate"
           value={hrValue?.toString() || '--'}
+          unit='BPM'
           icon={
             <Image
               source={require('../Assets/heart-rate.png')}
@@ -1229,7 +1230,7 @@ const styles = StyleSheet.create({
   },
   // Wellness Score Styles
   wellnessCard: {
-    backgroundColor: '#FCF8F8',
+    backgroundColor: '#f9f8fcff',
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
@@ -1691,7 +1692,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
-    backgroundColor: '#FCF8F8',
+    backgroundColor: '#f9f8fcff',
   },
   // Creates a soft glow/float effect around the circle
   shadowWrapper: {

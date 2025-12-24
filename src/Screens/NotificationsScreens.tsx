@@ -7,18 +7,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  StatusBar,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import Svg, {Path} from 'react-native-svg';
 
 // --- ICONS ---
-const BackIcon = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#1F2937" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M19 12H5M12 19l-7-7 7-7" />
-  </Svg>
-);
+
 
 const BellIcon = ({color = '#6B7280'}) => (
   <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -27,7 +22,7 @@ const BellIcon = ({color = '#6B7280'}) => (
   </Svg>
 );
 
-const NotificationsScreen = ({navigation}: {navigation: any}) => {
+const NotificationsScreen = ({}: {navigation: any}) => {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,16 +77,7 @@ const NotificationsScreen = ({navigation}: {navigation: any}) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <BackIcon />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={{width: 24}} />
-      </View>
 
       {loading ? (
         <ActivityIndicator size="large" color="#6366F1" style={{marginTop: 50}} />

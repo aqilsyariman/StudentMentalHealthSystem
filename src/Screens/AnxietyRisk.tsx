@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useCallback} from 'react';
 import {
   View,
   Text,
@@ -15,11 +15,15 @@ import {LinearGradient} from 'react-native-linear-gradient';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import {LineChart} from 'react-native-chart-kit';
+import {useRoute} from '@react-navigation/native';
 
 const SAVE_TO_FIRESTORE = true;
 const screenWidth = Dimensions.get('window').width;
 
 export default function AnxietyQuestionnaire() {
+  const route = useRoute();
+    const {studentId, viewOnly} = (route.params as any) || {};
+
   const [view, setView] = useState<'history' | 'questionnaire' | 'result'>(
     'history',
   );
@@ -119,35 +123,46 @@ export default function AnxietyQuestionnaire() {
   // --- HELPERS ---
 
   const getAnxietyScoreColor = (score: number | null) => {
-    if (score === null || score === undefined) {return '#9CA3AF';}
-    if (score <= 4) {return '#10B981';} // Green
-    if (score <= 9) {return '#F59E0B';} // Yellow
-    if (score <= 14) {return '#F97316';} // Orange
+    if (score === null || score === undefined) {
+      return '#9CA3AF';
+    }
+    if (score <= 4) {
+      return '#10B981';
+    } // Green
+    if (score <= 9) {
+      return '#F59E0B';
+    } // Yellow
+    if (score <= 14) {
+      return '#F97316';
+    } // Orange
     return '#EF4444'; // Red
   };
 
   const getResultInfo = (score: number) => {
-    if (score <= 4)
-      {return {
+    if (score <= 4) {
+      return {
         level: 'Minimal',
         colors: ['#34D399', '#14B8A6'],
         message: 'Minimal anxiety symptoms.',
         recommendation: 'Keep practicing relaxation techniques.',
-      };}
-    if (score <= 9)
-      {return {
+      };
+    }
+    if (score <= 9) {
+      return {
         level: 'Mild',
         colors: ['#FBBF24', '#F59E0B'],
         message: 'Mild anxiety symptoms.',
         recommendation: 'Mindfulness exercises may help.',
-      };}
-    if (score <= 14)
-      {return {
+      };
+    }
+    if (score <= 14) {
+      return {
         level: 'Moderate',
         colors: ['#FB923C', '#EF4444'],
         message: 'Moderate anxiety symptoms.',
         recommendation: 'Professional support recommended.',
-      };}
+      };
+    }
     return {
       level: 'Severe',
       colors: ['#DC2626', '#E11D48'],
@@ -162,8 +177,12 @@ export default function AnxietyQuestionnaire() {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {return 'Today';}
-    if (date.toDateString() === yesterday.toDateString()) {return 'Yesterday';}
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
     return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
   };
 
@@ -171,7 +190,9 @@ export default function AnxietyQuestionnaire() {
 
   // Filter results based on selected date
   const filteredResults = useMemo(() => {
-    if (!selectedDate || pastResults.length === 0) {return [];}
+    if (!selectedDate || pastResults.length === 0) {
+      return [];
+    }
 
     return pastResults
       .filter(result => {
@@ -256,7 +277,9 @@ export default function AnxietyQuestionnaire() {
 
   const saveToFirestore = async (finalAnswers: Record<number, number>) => {
     const currentUser = auth().currentUser;
-    if (!SAVE_TO_FIRESTORE || !currentUser) {return;}
+    if (!SAVE_TO_FIRESTORE || !currentUser) {
+      return;
+    }
 
     try {
       const score = Object.values(finalAnswers).reduce(
@@ -303,17 +326,21 @@ export default function AnxietyQuestionnaire() {
     }
   };
 
-  const fetchPastResults = async () => {
+  // Wrap in useCallback to prevent infinite loops
+  const fetchPastResults = useCallback(async () => {
     const currentUser = auth().currentUser;
-    if (!currentUser) {return;}
+    // Use the passed studentId if available (Counselor view), otherwise use current user (Student view)
+    const targetUid = studentId || currentUser?.uid;
+
+    if (!targetUid) return;
 
     setLoadingPastResults(true);
     try {
       const doc = await firestore()
         .collection('students')
-        .doc(currentUser.uid)
+        .doc(targetUid) 
         .collection('questionnaire')
-        .doc('anxietyRisk')
+        .doc('anxietyRisk') // <--- IMPORTANT: Ensure this says 'anxietyRisk'
         .get();
 
       if (doc.exists()) {
@@ -330,29 +357,29 @@ export default function AnxietyQuestionnaire() {
             }
           });
 
-          // Sort results most recent first for list view
+          // Sort by timestamp (Newest first)
           allResults.sort(
             (a, b) =>
               (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0),
           );
           setPastResults(allResults);
 
-          // Prepare dates for selector
           const sortedDates = Array.from(dates).sort().reverse();
           setAvailableDates(sortedDates);
-          if (sortedDates.length > 0) {setSelectedDate(sortedDates[0]);}
+          if (sortedDates.length > 0) setSelectedDate(sortedDates[0]);
         }
       }
     } catch (error) {
-      console.error('Failed to fetch past results:', error);
+      console.error('Failed to fetch past anxiety results:', error);
     } finally {
       setLoadingPastResults(false);
     }
-  };
+  }, [studentId]); // Dependency array ensures this updates if studentId changes
 
+  // Safe useEffect
   useEffect(() => {
     fetchPastResults();
-  }, []);
+  }, [fetchPastResults]);
 
   const returnToHistory = () => setView('history');
 
@@ -370,6 +397,7 @@ export default function AnxietyQuestionnaire() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Start Assessment Button */}
+        {!viewOnly && (
         <TouchableOpacity
           style={styles.startAssessmentButton}
           onPress={startAssessment}
@@ -384,7 +412,7 @@ export default function AnxietyQuestionnaire() {
               Check anxiety levels (GAD-7)
             </Text>
           </LinearGradient>
-        </TouchableOpacity>
+        </TouchableOpacity>)}
 
         {/* Latest Score Card */}
         {latestResult && (

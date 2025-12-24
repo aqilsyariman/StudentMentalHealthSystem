@@ -26,6 +26,7 @@ import AvgWellnessCounselor from './Screens/AvgWellnessCounselor';
 import CounselorActiveAlerts from './Screens/CounselorActiveAlerts';
 import SendAlerts from './Screens/SendAlert';
 import NotificationsScreen from './Screens/NotificationsScreens';
+import MoodAndEmotionCounselor from './Screens/MoodAndEmotionCounselor';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
@@ -157,7 +158,7 @@ const App = () => {
                 headerStyle: {
                   backgroundColor: '#fff0f0', // Your color here
                 },
-                headerTintColor: '#393838ff', // Text/icon color
+                headerTintColor: '#ff6f61', // Text/icon color
                 headerTitleStyle: {
                   fontWeight: 'bold',
                 },
@@ -172,17 +173,22 @@ const App = () => {
                 headerStyle: {
                   backgroundColor: '#fff5f0', // Your color here
                 },
+                headerTintColor: '#ff4500',
               }}
               name="StepsGraph"
               component={StepsGraph}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Sleep Tracker'}}
+              options={{headerShown: true, title: 'Sleep Tracker',headerStyle: {
+                  backgroundColor: '#eef1ff', // Your color here
+                },
+                headerTintColor: '#6366f1',
+              }}
               name="ManualSleepTracker"
               component={ManualSleepTracker}
             />
             <Stack.Screen
-              options={{headerShown: false, title: 'Messages'}}
+              options={{headerShown: true, title: 'Messages'}}
               name="Messages"
               component={Messages}
             />
@@ -197,7 +203,7 @@ const App = () => {
               component={HealthScoreScreen}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'NotificationsScreen'}}
+              options={{headerShown: true, title: 'Alert' ,headerBackTitle: 'Back'}}
               name="NotificationsScreen"
               component={NotificationsScreen}
             />
@@ -259,7 +265,7 @@ const App = () => {
               component={StepsGraph}
             />
             <Stack.Screen
-              options={{headerShown: false, title: 'Messages'}}
+              options={{headerShown: true, title: 'Messages'}}
               name="Messages"
               component={Messages}
             />
@@ -292,6 +298,39 @@ const App = () => {
               options={{headerShown: true, title: 'Health Score'}}
               name="HealthScoreScreen"
               component={HealthScoreScreen}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Mood & Emotion'}}
+              name="MoodAndEmotionCounselor"
+              component={MoodAndEmotionCounselor}
+            />
+            <Stack.Screen
+              options={{
+                headerShown: true,
+                title: 'Depression Risk',
+                headerStyle: {
+                  backgroundColor: '#E0F7FA', // Your color here
+                },
+                headerTintColor: '#0f856d', // Text/icon color
+              }}
+              name="DepressionRisk"
+              component={DepressionRisk}
+            />
+            <Stack.Screen
+              options={{
+                headerShown: true,
+                title: 'Anxiety Risk',
+                headerStyle: {
+                  backgroundColor: '#DBEAFE', // Light Cyan Background
+                },
+                // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
+                headerTintColor: '#1E40AF',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+              name="AnxietyRisk"
+              component={AnxietyRisk}
             />
           </Stack.Group>
         )}

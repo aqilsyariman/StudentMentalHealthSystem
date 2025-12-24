@@ -30,8 +30,10 @@ type Message = {
 const MessagesScreen = ({navigation}: Props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<'student' | 'counselor' | null>(null);
-  const [userName, setUserName] = useState('');
+  const [userRole, setUserRole] = useState<'student' | 'counselor' | null>(
+    null,
+  );
+  const [, setUserName] = useState('');
 
   useEffect(() => {
     const userId = auth().currentUser?.uid;
@@ -80,7 +82,7 @@ const MessagesScreen = ({navigation}: Props) => {
       }
 
       let query;
-      
+
       if (role === 'student') {
         query = firestore()
           .collection('conversations')
@@ -102,29 +104,32 @@ const MessagesScreen = ({navigation}: Props) => {
           const messagesList: Message[] = snapshot.docs.map(doc => {
             const data = doc.data();
             const isStudent = role === 'student';
-            
+
             return {
               id: doc.id,
               otherPersonId: isStudent ? data.counselorId : data.studentId,
-              otherPersonName: isStudent 
-                ? (data.counselorName || 'Counselor')
-                : (data.studentName || 'Student'),
+              otherPersonName: isStudent
+                ? data.counselorName || 'Counselor'
+                : data.studentName || 'Student',
               otherPersonAvatar: isStudent
-                ? (data.counselorAvatar || 'https://i.pravatar.cc/150?u=counselor')
-                : (data.studentAvatar || 'https://i.pravatar.cc/150?u=student'),
+                ? data.counselorAvatar ||
+                  'https://i.pravatar.cc/150?u=counselor'
+                : data.studentAvatar || 'https://i.pravatar.cc/150?u=student',
               lastMessage: data.lastMessage || 'Start a conversation',
               timestamp: data.lastMessageTime,
-              unread: isStudent ? (data.unread || false) : (data.counselorUnread || false),
+              unread: isStudent
+                ? data.unread || false
+                : data.counselorUnread || false,
               isOnline: Math.random() > 0.5, // Mock online status
             };
           });
-          
+
           messagesList.sort((a, b) => {
             if (!a.timestamp) return 1;
             if (!b.timestamp) return -1;
             return b.timestamp.toMillis() - a.timestamp.toMillis();
           });
-          
+
           setMessages(messagesList);
           setLoading(false);
         },
@@ -174,13 +179,10 @@ const MessagesScreen = ({navigation}: Props) => {
       }
       activeOpacity={0.6}>
       <View style={styles.avatarContainer}>
-        <Image
-          source={{uri: item.otherPersonAvatar}}
-          style={styles.avatar}
-        />
+        <Image source={{uri: item.otherPersonAvatar}} style={styles.avatar} />
         {item.isOnline && <View style={styles.onlineDot} />}
       </View>
-      
+
       <View style={styles.messageContent}>
         <View style={styles.topRow}>
           <Text style={styles.personName} numberOfLines={1}>
@@ -189,10 +191,7 @@ const MessagesScreen = ({navigation}: Props) => {
           <Text style={styles.time}>{formatTime(item.timestamp)}</Text>
         </View>
         <Text
-          style={[
-            styles.lastMessage,
-            item.unread && styles.unreadMessage
-          ]}
+          style={[styles.lastMessage, item.unread && styles.unreadMessage]}
           numberOfLines={2}>
           {item.lastMessage}
         </Text>
@@ -205,38 +204,10 @@ const MessagesScreen = ({navigation}: Props) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      {/* Instagram-style Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}>
-          <Svg width={28} height={28} viewBox="0 0 24 24">
-            <Path
-              d="M15 18L9 12L15 6"
-              stroke="#000000"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </Svg>
-        </TouchableOpacity>
 
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerUsername}>{userName}</Text>
-          <Svg width={12} height={8} viewBox="0 0 12 8" style={styles.dropdownIcon}>
-            <Path
-              d="M1 1L6 6L11 1"
-              stroke="#000000"
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </Svg>
-        </View>
+      {/* Instagram-style Header */}
+      <View>
+        
 
         {userRole === 'counselor' && (
           <TouchableOpacity
@@ -293,8 +264,8 @@ const MessagesScreen = ({navigation}: Props) => {
           </View>
           <Text style={styles.emptyTitle}>Your Messages</Text>
           <Text style={styles.emptyText}>
-            {userRole === 'counselor' 
-              ? 'Send private messages to students' 
+            {userRole === 'counselor'
+              ? 'Send private messages to students'
               : 'Messages from your counselor will appear here'}
           </Text>
           {userRole === 'counselor' && (
@@ -349,9 +320,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000000',
-  },
-  dropdownIcon: {
-    marginTop: 2,
   },
   newMessageButton: {
     padding: 8,

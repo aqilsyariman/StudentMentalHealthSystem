@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {useState, useEffect} from 'react';
+import React, {useState, useCallback, useEffect} from 'react'; // Added useEffect to imports
 import {
   View,
   Text,
@@ -11,13 +11,15 @@ import {
   TextInput,
   StatusBar,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import Svg, {Path} from 'react-native-svg';
+import {useFocusEffect} from '@react-navigation/native';
 
 // --- TYPES ---
-type StudentStatus = 'At Risk' | 'Needs Check-in' | 'Stable';
+type StudentStatus = 'At Risk' | 'Needs Check-in' | 'Stable' | 'No Data';
 
 type Student = {
   id: string;
@@ -25,7 +27,23 @@ type Student = {
   email: string;
   status: StudentStatus;
   avatar: string | null;
-  counselorId: string | null;
+  score: number | null;
+};
+
+// --- HELPER FUNCTIONS (Moved Outside Component) ---
+// These are now stable and won't cause re-renders
+const getTodayKey = () => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const calculateStatus = (score: number): StudentStatus => {
+  if (score < 50) return 'At Risk';
+  if (score < 75) return 'Needs Check-in';
+  return 'Stable';
 };
 
 // --- SEARCH ICON ---
@@ -38,49 +56,98 @@ const SearchIcon = ({color = '#9CA3AF'}) => (
 const ListStudent = ({navigation}: {navigation: any}) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
 
-  // --- FETCH DATA ---
-  useEffect(() => {
-    const fetchStudents = async () => {
-      const currentCounselorId = auth().currentUser?.uid;
+  // 1. fetchStudents is now truly stable because its helpers are external
+  const fetchStudents = useCallback(async () => {
+    const currentCounselorId = auth().currentUser?.uid;
 
-      if (!currentCounselorId) {
-        setLoading(false);
-        return;
-      }
+    if (!currentCounselorId) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
-      try {
-        const studentSnapshot = await firestore()
-          .collection('students')
-          .where('counselorId', '==', currentCounselorId)
-          .get();
+    try {
+      const studentSnapshot = await firestore()
+        .collection('students')
+        .where('counselorId', '==', currentCounselorId)
+        .get();
 
-        const studentList: Student[] = [];
-        studentSnapshot.forEach(doc => {
-          const data = doc.data();
-          studentList.push({
-            id: doc.id,
-            name: data.fullName || 'Unnamed Student',
-            email: data.email || 'No Email',
-            status: data.status || 'Stable',
-            avatar: data.avatar || null,
-            counselorId: data.counselorId || null,
-          });
-        });
+      const todayKey = getTodayKey();
 
-        setStudents(studentList);
-        setFilteredStudents(studentList);
-      } catch (error) {
-        console.error('Error fetching students: ', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const studentPromises = studentSnapshot.docs.map(async doc => {
+        const data = doc.data();
+        let currentStatus: StudentStatus = 'No Data';
+        let currentScore: number | null = null;
 
+        try {
+          const scoreDoc = await firestore()
+            .collection('students')
+            .doc(doc.id)
+            .collection('wellnessScore')
+            .doc('scores')
+            .get();
+
+          if (scoreDoc.exists()) {
+            const scoreData = scoreDoc.data();
+            if (scoreData?.data && scoreData.data[todayKey]) {
+              currentScore = scoreData.data[todayKey].finalScore;
+              if (currentScore !== null && currentScore !== undefined) {
+                currentStatus = calculateStatus(currentScore);
+              }
+            }
+          }
+        } catch (err) {
+          console.log(`Error fetching score for ${data.fullName}`, err);
+        }
+
+        return {
+          id: doc.id,
+          name: data.fullName || 'Unnamed Student',
+          email: data.email || 'No Email',
+          status: currentStatus,
+          score: currentScore,
+          avatar: data.avatar || null,
+        };
+      });
+
+      const studentList = await Promise.all(studentPromises);
+
+      const statusPriority = {
+        'At Risk': 1,
+        'Needs Check-in': 2,
+        'No Data': 3,
+        'Stable': 4,
+      };
+
+      studentList.sort((a, b) => {
+        return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
+      });
+
+      setStudents(studentList);
+      setFilteredStudents(studentList);
+    } catch (error) {
+      console.error('Error fetching students: ', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []); // Dependencies are now safely empty
+
+  // 2. This is the correct way to trigger it on focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchStudents();
+    }, [fetchStudents]) // Now this is valid because fetchStudents is memoized
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
     fetchStudents();
-  }, []);
+  };
 
   // --- SEARCH LOGIC ---
   useEffect(() => {
@@ -102,13 +169,17 @@ const ListStudent = ({navigation}: {navigation: any}) => {
     switch (status) {
       case 'At Risk': return {bg: '#FEF2F2', text: '#EF4444', dot: '#EF4444'};
       case 'Needs Check-in': return {bg: '#FFFBEB', text: '#F59E0B', dot: '#F59E0B'};
+      case 'No Data': return {bg: '#F3F4F6', text: '#9CA3AF', dot: '#9CA3AF'};
       case 'Stable': default: return {bg: '#ECFDF5', text: '#10B981', dot: '#10B981'};
     }
   };
 
   const handleStudentPress = (student: Student) => {
     if (navigation) {
-      navigation.navigate('StudentDetail', {studentId: student.id});
+      navigation.navigate('HealthScoreScreen', {
+        studentId: student.id,
+        studentName: student.name
+      });
     }
   };
 
@@ -116,7 +187,7 @@ const ListStudent = ({navigation}: {navigation: any}) => {
     return (
       <View style={[styles.fullContainer, styles.centerContainer]}>
         <ActivityIndicator size="large" color="#8B5CF6" />
-        <Text style={styles.loadingText}>Loading Students...</Text>
+        <Text style={styles.loadingText}>Loading Student Data...</Text>
       </View>
     );
   }
@@ -128,7 +199,6 @@ const ListStudent = ({navigation}: {navigation: any}) => {
       {/* HEADER */}
       <View style={styles.headerContainer}>
         <View>
-       
           <Text style={styles.headerSubtitle}>
             You have <Text style={{fontWeight: '700', color: '#8B5CF6'}}>{students.length}</Text> assigned students
           </Text>
@@ -153,6 +223,9 @@ const ListStudent = ({navigation}: {navigation: any}) => {
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8B5CF6']} />
+        }
         keyboardShouldPersistTaps="handled">
         
         {filteredStudents.length === 0 ? (
@@ -164,11 +237,7 @@ const ListStudent = ({navigation}: {navigation: any}) => {
         ) : (
           filteredStudents.map(student => {
             const colors = getStatusColor(student.status);
-
-            // LOGIC FIXED: Prefer uploaded avatar -> Fallback to Pravatar (Random Face)
-            const avatarUrl = student.avatar 
-              ? student.avatar 
-              : `https://i.pravatar.cc/150?u=${student.email}`;
+            const avatarUrl = student.avatar ? student.avatar : `https://i.pravatar.cc/150?u=${student.email}`;
 
             return (
               <TouchableOpacity
@@ -178,25 +247,22 @@ const ListStudent = ({navigation}: {navigation: any}) => {
                 activeOpacity={0.7}>
                 
                 <View style={styles.cardContent}>
-                  
-                  {/* AVATAR IMAGE */}
-                  <Image
-                    style={styles.avatar}
-                    source={{uri: avatarUrl}}
-                  />
-
+                  <Image style={styles.avatar} source={{uri: avatarUrl}} />
                   <View style={styles.infoContainer}>
                     <Text style={styles.studentName}>{student.name}</Text>
                     <Text style={styles.studentEmail}>{student.email}</Text>
+                    {student.score !== null && (
+                        <Text style={styles.scoreText}>
+                            Today's Score: <Text style={{fontWeight: '700', color: colors.text}}>{student.score}</Text>
+                        </Text>
+                    )}
                   </View>
-
                   <View style={[styles.statusPill, {backgroundColor: colors.bg}]}>
                      <View style={[styles.statusDot, {backgroundColor: colors.dot}]} />
                      <Text style={[styles.statusText, {color: colors.text}]}>
                         {student.status === 'Needs Check-in' ? 'Check-in' : student.status}
                      </Text>
                   </View>
-                  
                   <Text style={styles.arrowIcon}>›</Text>
                 </View>
               </TouchableOpacity>
@@ -310,6 +376,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#9CA3AF',
     fontWeight: '500',
+  },
+  scoreText: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 2,
   },
   statusPill: {
     flexDirection: 'row',
