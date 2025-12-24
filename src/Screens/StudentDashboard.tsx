@@ -26,6 +26,24 @@ import {RootStackParamList} from '../types/navigation';
 import {Image} from 'react-native';
 import {AnimatedCircularProgress} from 'react-native-circular-progress';
 
+const useUnreadNotifications = () => {
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    const user = auth().currentUser;
+    if (!user) return;
+    const unsubscribe = firestore()
+      .collection('notifications')
+      .where('recipientId', '==', user.uid)
+      .where('read', '==', false)
+      .onSnapshot(
+        qs => setUnreadCount(qs.size),
+        err => console.log('Notif error', err),
+      );
+    return () => unsubscribe();
+  }, []);
+  return unreadCount;
+};
+
 // 1. MODIFIED HOOK: Now includes 'refetch' in the return object
 const useHealthData = (collectionName: string) => {
   const [value, setValue] = useState<number | null>(null);
@@ -85,6 +103,12 @@ const useHealthData = (collectionName: string) => {
 
 export const useHeartRate = () => useHealthData('heartRate');
 export const useStepCount = () => useHealthData('stepCount');
+
+// ... existing imports
+
+// NEW HOOK: Listen for unread notifications
+
+// ... existing code
 
 // ... existing useHealthData hook ...
 
@@ -292,6 +316,7 @@ const DashboardScreen = ({navigation}: Props) => {
   const sleepScore = sleep?.score;
 
   const [studentName, setStudentName] = useState<string>('Loading...');
+  const unreadCount = useUnreadNotifications();
 
   // Wrapped in useCallback so it can be used in onRefresh safely
   const fetchStudentName = useCallback(async (currentStudentId: string) => {
@@ -561,7 +586,7 @@ const DashboardScreen = ({navigation}: Props) => {
             titleColor="#6B7280"
           />
         }>
-        {/* Header Section */}
+        {/* HEADER SECTION */}
         <View style={styles.header}>
           <Image
             style={styles.profileCircle}
@@ -574,20 +599,44 @@ const DashboardScreen = ({navigation}: Props) => {
           <View style={styles.headerText}>
             <Text style={styles.greeting}>
               Hello,{' '}
-              {studentName?.charAt(0).toUpperCase() + studentName?.slice(1)}! 👋
+              {studentName?.charAt(0).toUpperCase() + studentName?.slice(1)}!
             </Text>
-            <Text style={styles.subtitle}>Here's your health overview</Text>
           </View>
-          <TouchableOpacity
-            style={styles.messageButton}
-            onPress={() => navigation.navigate('Messages')}
-            activeOpacity={0.7}>
-            <Image
-              source={require('../Assets/message.png')}
-              style={{width: 40, height: 40}}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+
+          {/* RIGHT SIDE BUTTONS CONTAINER */}
+          <View style={styles.headerIconsContainer}>
+            {/* 1. NOTIFICATION BELL */}
+            <TouchableOpacity
+              style={styles.iconButton}
+              // Cast as any to bypass TS error if type definition isn't updated yet
+              onPress={() => navigation.navigate('NotificationsScreen' as any)}
+              activeOpacity={0.7}>
+              <Image
+                source={require('../Assets/bell.png')}
+                style={{width: 28, height: 28}}
+                resizeMode="contain"
+              />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* 2. MESSAGE BUTTON */}
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => navigation.navigate('Messages')}
+              activeOpacity={0.7}>
+              <Image
+                source={require('../Assets/message.png')}
+                style={{width: 28, height: 28}}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ... Rest of your UI (Cards, etc) remains exactly the same ... */}
@@ -636,18 +685,18 @@ const DashboardScreen = ({navigation}: Props) => {
                         {wellnessScore}
                       </Text>
                       <Text style={styles.percentageSign}>%</Text>
-                      <View style={styles.labelBadge}>
-                        <Text
-                          style={[
-                            styles.wellnessScoreLabel,
-                            {color: getWellnessScoreColor(wellnessScore)},
-                          ]}>
-                          {getWellnessScoreLabel(wellnessScore).toUpperCase()}
-                        </Text>
-                      </View>
                     </View>
                   )}
                 </AnimatedCircularProgress>
+                <View style={styles.labelBadge}>
+                  <Text
+                    style={[
+                      styles.wellnessScoreLabel,
+                      {color: getWellnessScoreColor(wellnessScore)},
+                    ]}>
+                    {getWellnessScoreLabel(wellnessScore).toUpperCase()}
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -1142,9 +1191,41 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 12,
     color: '#6B7280',
     fontWeight: '500',
+  },
+  headerIconsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 25,
+  },
+  iconButton: {
+    width: 45,
+    height: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // BADGE STYLES
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    paddingHorizontal: 2,
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   // Wellness Score Styles
   wellnessCard: {
@@ -1628,39 +1709,41 @@ const styles = StyleSheet.create({
     }),
   },
   wellnessScoreTextInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'flex-end', // aligns % to number baseline nicely
   },
   // The big number
   wellnessScoreValue: {
     fontSize: 42,
-    fontWeight: '800', // Extra bold for impact
-    color: '#111827', // Slate 900
+    fontWeight: '800',
+    color: '#111827',
     letterSpacing: -1,
   },
   // Separate % sign styling for better typography hierarchy
   percentageSign: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6B7280', // Muted gray
-    position: 'absolute',
-    right: -15,
-    top: 10,
+    color: '#6B7280',
+    marginBottom: 6, // fine-tune vertical alignment
+    marginLeft: 2, // small spacing from number
   },
   // The status label (e.g., "EXCELLENT")
   labelBadge: {
-    marginTop: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: '#F3F4F6', // Light gray background pill
-    borderRadius: 20,
-  },
-  wellnessScoreLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
+  marginTop: 4,
+  paddingHorizontal: 12,
+  paddingVertical: 4,
+  borderRadius: 20,
+
+  alignItems: 'center',      // horizontal center
+  justifyContent: 'center',  // vertical center
+},
+  
+wellnessScoreLabel: {
+  marginTop: 15,
+  fontSize: 17,
+  fontWeight: '700',
+  textAlign: 'center',       // safety for Android
+},
   // ... existing styles
   sectionHeaderContainer: {
     marginTop: 24, // Space from the previous card

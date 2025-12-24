@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -212,16 +213,16 @@ const CounselorWellnessDashboard = ({navigation}: {navigation: any}) => {
 
   // --- HELPER FUNCTIONS ---
   const getScoreColor = (score: number) => {
-    if (score >= 80) return '#10B981';
-    if (score >= 60) return '#F59E0B';
-    if (score >= 40) return '#F97316';
+    if (score >= 80) {return '#10B981';}
+    if (score >= 60) {return '#F59E0B';}
+    if (score >= 40) {return '#F97316';}
     return '#EF4444';
   };
 
   const getScoreLabel = (score: number) => {
-    if (score >= 80) return 'Excellent';
-    if (score >= 60) return 'Good';
-    if (score >= 40) return 'Fair';
+    if (score >= 80) {return 'Excellent';}
+    if (score >= 60) {return 'Good';}
+    if (score >= 40) {return 'Fair';}
     return 'At Risk';
   };
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import React, {useState, useEffect} from 'react';
 import {
   View,
@@ -95,7 +96,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
             if (dateKeys.length > 0) {
               const latestDateKey = dateKeys[0];
               const scoreData = scoresData.data[latestDateKey];
-              
+
               latestScore = {
                 finalScore: scoreData.finalScore || 0,
                 sleepScore: scoreData.sleepScore || 0,
@@ -133,7 +134,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
       // ============================================================
       if (tempStudentList.length > 0) {
         const batch = firestore().batch();
-        
+
         tempStudentList.forEach(student => {
           const alertRef = firestore()
             .collection('counselors')
@@ -147,7 +148,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
             studentId: student.id,
             email: student.email,
             flaggedAt: firestore.FieldValue.serverTimestamp(), // When the system flagged them
-            scoreDate: student.latestScore?.date // When the score was recorded
+            scoreDate: student.latestScore?.date, // When the score was recorded
           }, { merge: true });
         });
 
@@ -246,7 +247,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
                 style={styles.alertCard}
                 onPress={() => handleStudentPress(student)}
                 activeOpacity={0.8}>
-                
+
                 <View style={styles.urgencyStrip} />
 
                 <View style={styles.cardContent}>

@@ -24,7 +24,8 @@ import ChatScreen from './Screens/ChatScreen';
 import HealthScoreScreen from './Screens/GraphScreen/HealthScoreScreen';
 import AvgWellnessCounselor from './Screens/AvgWellnessCounselor';
 import CounselorActiveAlerts from './Screens/CounselorActiveAlerts';
-
+import SendAlerts from './Screens/SendAlert';
+import NotificationsScreen from './Screens/NotificationsScreens';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
@@ -195,6 +196,11 @@ const App = () => {
               name="HealthScoreScreen"
               component={HealthScoreScreen}
             />
+            <Stack.Screen
+              options={{headerShown: true, title: 'NotificationsScreen'}}
+              name="NotificationsScreen"
+              component={NotificationsScreen}
+            />
           </Stack.Group>
         ) : (
           // --- 4. LOGGED IN (Counselor) ---
@@ -276,6 +282,11 @@ const App = () => {
               options={{headerShown: true, title: 'Counselor Active Alerts'}}
               name="CounselorActiveAlerts"
               component={CounselorActiveAlerts}
+            />
+            <Stack.Screen
+              options={{headerShown: true, title: 'Send Alerts'}}
+              name="SendAlerts"
+              component={SendAlerts}
             />
             <Stack.Screen
               options={{headerShown: true, title: 'Health Score'}}

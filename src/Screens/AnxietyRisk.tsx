@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Dimensions,
-  Image
+  Image,
 } from 'react-native';
 import {LinearGradient} from 'react-native-linear-gradient';
 import firestore from '@react-native-firebase/firestore';
@@ -119,35 +119,35 @@ export default function AnxietyQuestionnaire() {
   // --- HELPERS ---
 
   const getAnxietyScoreColor = (score: number | null) => {
-    if (score === null || score === undefined) return '#9CA3AF';
-    if (score <= 4) return '#10B981'; // Green
-    if (score <= 9) return '#F59E0B'; // Yellow
-    if (score <= 14) return '#F97316'; // Orange
+    if (score === null || score === undefined) {return '#9CA3AF';}
+    if (score <= 4) {return '#10B981';} // Green
+    if (score <= 9) {return '#F59E0B';} // Yellow
+    if (score <= 14) {return '#F97316';} // Orange
     return '#EF4444'; // Red
   };
 
   const getResultInfo = (score: number) => {
     if (score <= 4)
-      return {
+      {return {
         level: 'Minimal',
         colors: ['#34D399', '#14B8A6'],
         message: 'Minimal anxiety symptoms.',
         recommendation: 'Keep practicing relaxation techniques.',
-      };
+      };}
     if (score <= 9)
-      return {
+      {return {
         level: 'Mild',
         colors: ['#FBBF24', '#F59E0B'],
         message: 'Mild anxiety symptoms.',
         recommendation: 'Mindfulness exercises may help.',
-      };
+      };}
     if (score <= 14)
-      return {
+      {return {
         level: 'Moderate',
         colors: ['#FB923C', '#EF4444'],
         message: 'Moderate anxiety symptoms.',
         recommendation: 'Professional support recommended.',
-      };
+      };}
     return {
       level: 'Severe',
       colors: ['#DC2626', '#E11D48'],
@@ -162,8 +162,8 @@ export default function AnxietyQuestionnaire() {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) return 'Today';
-    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    if (date.toDateString() === today.toDateString()) {return 'Today';}
+    if (date.toDateString() === yesterday.toDateString()) {return 'Yesterday';}
     return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
   };
 
@@ -171,7 +171,7 @@ export default function AnxietyQuestionnaire() {
 
   // Filter results based on selected date
   const filteredResults = useMemo(() => {
-    if (!selectedDate || pastResults.length === 0) return [];
+    if (!selectedDate || pastResults.length === 0) {return [];}
 
     return pastResults
       .filter(result => {
@@ -256,7 +256,7 @@ export default function AnxietyQuestionnaire() {
 
   const saveToFirestore = async (finalAnswers: Record<number, number>) => {
     const currentUser = auth().currentUser;
-    if (!SAVE_TO_FIRESTORE || !currentUser) return;
+    if (!SAVE_TO_FIRESTORE || !currentUser) {return;}
 
     try {
       const score = Object.values(finalAnswers).reduce(
@@ -305,7 +305,7 @@ export default function AnxietyQuestionnaire() {
 
   const fetchPastResults = async () => {
     const currentUser = auth().currentUser;
-    if (!currentUser) return;
+    if (!currentUser) {return;}
 
     setLoadingPastResults(true);
     try {
@@ -340,7 +340,7 @@ export default function AnxietyQuestionnaire() {
           // Prepare dates for selector
           const sortedDates = Array.from(dates).sort().reverse();
           setAvailableDates(sortedDates);
-          if (sortedDates.length > 0) setSelectedDate(sortedDates[0]);
+          if (sortedDates.length > 0) {setSelectedDate(sortedDates[0]);}
         }
       }
     } catch (error) {

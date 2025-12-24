@@ -22,5 +22,7 @@ export type RootStackParamList = {
   HealthScoreScreen: undefined;
   AvgWellnessScore: undefined;
   CounselorActiveAlerts: undefined;
+  SendAlerts: undefined;
+  NotificationsScreen: undefined;
 
 };

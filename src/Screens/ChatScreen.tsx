@@ -51,16 +51,16 @@ const ChatScreen = ({navigation, route}: Props) => {
             .collection('counselors')
             .doc(otherPersonId)
             .get();
-          
+
           if (counselorDoc.exists()) {
             setOtherPersonAvatar(
-              counselorDoc.data()?.photoURL || 
+              counselorDoc.data()?.photoURL ||
               `https://i.pravatar.cc/150?u=${otherPersonId}`
             );
           }
         } else {
           setOtherPersonAvatar(
-            userDoc.data()?.photoURL || 
+            userDoc.data()?.photoURL ||
             `https://i.pravatar.cc/150?u=${otherPersonId}`
           );
         }
@@ -113,7 +113,7 @@ const ChatScreen = ({navigation, route}: Props) => {
           if (doc.exists()) {
             const data = doc.data();
             const isStudent = data?.studentId === currentUserId;
-            
+
             firestore()
               .collection('conversations')
               .doc(conversationId)
@@ -128,7 +128,7 @@ const ChatScreen = ({navigation, route}: Props) => {
   }, [conversationId, otherPersonId, currentUserId]);
 
   const sendMessage = async () => {
-    if (!inputText.trim() || !currentUserId) return;
+    if (!inputText.trim() || !currentUserId) {return;}
 
     const messageText = inputText.trim();
     setInputText('');
@@ -141,7 +141,7 @@ const ChatScreen = ({navigation, route}: Props) => {
         .collection('students')
         .doc(currentUserId)
         .get();
-      
+
       if (studentDoc.exists()) {
         senderName = studentDoc.data()?.fullName || 'Student';
       } else {
@@ -149,7 +149,7 @@ const ChatScreen = ({navigation, route}: Props) => {
           .collection('counselors')
           .doc(currentUserId)
           .get();
-        
+
         if (counselorDoc.exists()) {
           senderName = counselorDoc.data()?.fullName || 'Counselor';
         }
@@ -192,7 +192,7 @@ const ChatScreen = ({navigation, route}: Props) => {
   };
 
   const formatDateHeader = (timestamp: any) => {
-    if (!timestamp) return '';
+    if (!timestamp) {return '';}
     const date = timestamp.toDate();
     const today = new Date();
     const yesterday = new Date(today);
@@ -215,8 +215,8 @@ const ChatScreen = ({navigation, route}: Props) => {
   };
 
   const shouldShowDateHeader = (currentMsg: ChatMessage, nextMsg: ChatMessage | undefined) => {
-    if (!currentMsg.timestamp) return false;
-    if (!nextMsg || !nextMsg.timestamp) return true;
+    if (!currentMsg.timestamp) {return false;}
+    if (!nextMsg || !nextMsg.timestamp) {return true;}
 
     const currentDate = currentMsg.timestamp.toDate();
     const nextDate = nextMsg.timestamp.toDate();

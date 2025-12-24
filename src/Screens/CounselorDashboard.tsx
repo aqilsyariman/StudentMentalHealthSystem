@@ -285,7 +285,7 @@ const CounselorDashboard = ({navigation}: Props) => {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7} onPress={() => navigation.navigate('SendAlerts')}>
               <View style={[styles.box, styles.box3]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
                   <G scale="5" x="40" y="40" fill="none" stroke="#f15252ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
