@@ -29,9 +29,10 @@ interface HealthScores {
   bloodPressure: MetricScore;
 }
 
-const HealthScoreScreen = () => {
+const HealthScoreScreen = ({route}: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { studentId, studentName } = route?.params || {};
   const [healthScores, setHealthScores] = useState<HealthScores>({
     sleep: {value: null, score: null, date: null},
     steps: {value: null, score: null, date: null},
@@ -67,8 +68,12 @@ const HealthScoreScreen = () => {
   const fetchAllHealthData = useCallback(
     async (dateToFetch?: Date) => {
       const user = auth().currentUser;
-      if (!user) {
-        console.warn('User not authenticated');
+      
+      // FIX: Use studentId if available (Counselor view), otherwise logged-in user (Student view)
+      const targetUid = studentId || user?.uid;
+
+      if (!targetUid) {
+        console.warn('No user ID available');
         setLoading(false);
         return;
       }
@@ -273,11 +278,12 @@ const HealthScoreScreen = () => {
       };
 
       try {
+        // FIX: Use targetUid for all fetch calls
         const [sleepData, stepsData, hrData, bpData] = await Promise.all([
-          fetchSleepScore(user.uid, dateKey),
-          fetchStepsScore(user.uid, dateKey),
-          fetchHeartRateScore(user.uid, dateKey),
-          fetchBloodPressureScore(user.uid, dateKey),
+          fetchSleepScore(targetUid, dateKey),
+          fetchStepsScore(targetUid, dateKey),
+          fetchHeartRateScore(targetUid, dateKey),
+          fetchBloodPressureScore(targetUid, dateKey),
         ]);
 
         setHealthScores({
@@ -303,8 +309,9 @@ const HealthScoreScreen = () => {
           setFinalScore(final);
 
           if (checkIsToday(targetDateObj)) {
+            // FIX: Use targetUid when saving
             await saveWellnessScore(
-              user.uid,
+              targetUid,
               dateKey,
               sleepData,
               stepsData,
@@ -323,9 +330,8 @@ const HealthScoreScreen = () => {
         setRefreshing(false);
       }
     },
-    [selectedDate],
+    [selectedDate, studentId], // FIX: Add studentId dependency
   );
-
   useEffect(() => {
     fetchAllHealthData();
   }, [fetchAllHealthData]);
@@ -459,10 +465,12 @@ const HealthScoreScreen = () => {
       )}
 
       {/* Overall Score Section */}
-      <View style={styles.overallScoreContainer}>
-        <Text style={styles.headerTitle}>Wellness Score</Text>
+<View style={styles.overallScoreContainer}>
+        {/* CHANGE THIS TEXT */}
+        <Text style={styles.headerTitle}>
+            {studentName ? `${studentName.split(' ')[0]}'s Score` : 'Wellness Score'}
+        </Text>
         <Text style={styles.dateText}>{targetDate}</Text>
-
         {!hasCompleteData ? (
           <View style={styles.warningContainer}>
             <View style={styles.warningIconContainer}>

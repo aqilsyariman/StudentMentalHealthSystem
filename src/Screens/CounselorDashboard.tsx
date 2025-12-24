@@ -16,23 +16,16 @@ import {useFocusEffect} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types/navigation';
 
-// --- MOCK DATA ---
-const recentAlerts = [
-  {
-    id: '1',
-    title: 'Student A has a critical alert',
-    time: '1 hour ago',
-    status: 'High',
-    color: '#EF4444',
-  },
-  {
-    id: '2',
-    title: 'Student B is pending approval',
-    time: '2 hours ago',
-    status: 'On Hold',
-    color: '#F59E0B',
-  },
-];
+// --- TYPES ---
+interface AlertItem {
+  id: string;
+  studentName: string;
+  score: number;
+  flaggedAt: any;
+  status: string;
+  color: string;
+  timeAgo: string;
+}
 
 const todaysSchedule = [
   {
@@ -58,8 +51,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CounselorDashboard'>;
 const CounselorDashboard = ({navigation}: Props) => {
   const [activeStudents, setActiveStudents] = useState<number | null>(null);
   const [counselorName, setCounselorName] = useState<string>('Loading...');
+  const [avgWellnessScore, setAvgWellnessScore] = useState<number | null>(null);
+  const [atRiskCount, setAtRiskCount] = useState<number | null>(null);
+  // 1. New State for Recent Alerts List
+  const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>([]);
 
-  // --- LOGIC ---
+  // --- DATA FETCHING ---
   const fetchStudentCount = async (currentCounselorId: string) => {
     try {
       const snapshot = await firestore()
@@ -100,15 +97,85 @@ const CounselorDashboard = ({navigation}: Props) => {
     }
   };
 
+  const fetchDashboardStats = async (currentCounselorId: string) => {
+    try {
+      const statsDoc = await firestore()
+        .collection('counselors')
+        .doc(currentCounselorId)
+        .collection('dashboardStats')
+        .doc('summary')
+        .get();
+
+      if (statsDoc.exists()) {
+        const data = statsDoc.data();
+        setAvgWellnessScore(data?.averageWellnessScore || 0);
+        setAtRiskCount(data?.atRiskStudents || 0);
+      } else {
+        setAvgWellnessScore(0);
+        setAtRiskCount(0);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats: ', error);
+    }
+  };
+
+  // 2. Fetch Recent Alerts Function
+  const fetchRecentAlerts = async (currentCounselorId: string) => {
+    try {
+      const alertsSnapshot = await firestore()
+        .collection('counselors')
+        .doc(currentCounselorId)
+        .collection('activeAlerts')
+        .orderBy('flaggedAt', 'desc')
+        .limit(3) // Limit to top 3
+        .get();
+
+      const alerts: AlertItem[] = alertsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const score = data.score || 0;
+        
+        // Determine status/color based on score
+        let status = 'High Risk';
+        let color = '#EF4444'; // Red
+        if (score < 30) {
+          status = 'Critical';
+          color = '#B91C1C'; // Dark Red
+        } else if (score < 40) {
+          status = 'Warning';
+          color = '#F59E0B'; // Orange
+        }
+
+        return {
+          id: doc.id,
+          studentName: data.studentName || 'Unknown Student',
+          score: score,
+          flaggedAt: data.flaggedAt,
+          status: status,
+          color: color,
+          timeAgo: formatTimeAgo(data.flaggedAt),
+        };
+      });
+
+      setRecentAlerts(alerts);
+    } catch (error) {
+      console.error('Error fetching recent alerts:', error);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       const currentUserId = auth().currentUser?.uid;
       if (currentUserId) {
         fetchStudentCount(currentUserId);
         fetchCounselorName(currentUserId);
+        fetchDashboardStats(currentUserId);
+        fetchRecentAlerts(currentUserId); // Call the new function
       } else {
         setActiveStudents(0);
         setCounselorName('Guest');
+        setAvgWellnessScore(0);
+        setAtRiskCount(0);
+        setRecentAlerts([]);
       }
     }, []),
   );
@@ -124,7 +191,6 @@ const CounselorDashboard = ({navigation}: Props) => {
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}>
-        
         {/* HEADER */}
         <View style={styles.header}>
           <Image
@@ -164,18 +230,22 @@ const CounselorDashboard = ({navigation}: Props) => {
           />
           <StatCard
             label="Active Alerts"
-            value="3"
-            subLabel="Needs attention"
+            value={atRiskCount !== null ? atRiskCount : '-'}
+            subLabel="Students at risk"
             icon={require('../Assets/warning.png')}
             color="#EF4444"
-            isWarning
+            isWarning={atRiskCount !== null && atRiskCount > 0}
+            applyColorToValue={true}
+            onPress={() => navigation.navigate('CounselorActiveAlerts')}
           />
           <StatCard
             label="Avg Wellness"
-            value="78%"
-            subLabel="Stable"
+            value={avgWellnessScore !== null ? avgWellnessScore : '--'}
+            subLabel={getWellnessLabel(avgWellnessScore)}
             icon={require('../Assets/services.png')}
-            color="#10B981"
+            color={getLabelColor(avgWellnessScore)}
+            applyColorToValue={true}
+            onPress={() => navigation.navigate('AvgWellnessScore')}
           />
           <StatCard
             label="Sessions"
@@ -186,118 +256,146 @@ const CounselorDashboard = ({navigation}: Props) => {
           />
         </View>
 
-        {/* 2. QUICK ACTIONS (Restored Original) */}
+        {/* 2. QUICK ACTIONS */}
         <SectionHeader title="Quick Actions" />
         <View style={styles.cardContainer}>
-           <View style={styles.gridContainer}>
-              {/* Box 1: Add Student */}
-              <TouchableOpacity
-                style={styles.boxWrapper}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('AddStudentScreen')}>
-                <View style={[styles.box, styles.box1]}>
-                  <Svg width={35} height={35} viewBox="0 0 200 200">
-                    <G scale="5" x="40" y="40" stroke="#489448ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                      <Path d="M6 12H18M12 6V18" />
-                    </G>
-                  </Svg>
-                  <Text style={styles.boxText1}>Add Student</Text>
-                </View>
-              </TouchableOpacity>
+          <View style={styles.gridContainer}>
+            <TouchableOpacity
+              style={styles.boxWrapper}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('AddStudentScreen')}>
+              <View style={[styles.box, styles.box1]}>
+                <Svg width={35} height={35} viewBox="0 0 200 200">
+                  <G scale="5" x="40" y="40" stroke="#489448ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M6 12H18M12 6V18" />
+                  </G>
+                </Svg>
+                <Text style={styles.boxText1}>Add Student</Text>
+              </View>
+            </TouchableOpacity>
 
-              {/* Box 2: New Report */}
-              <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
-                <View style={[styles.box, styles.box2]}>
-                  <Svg width={35} height={35} viewBox="0 0 200 200">
-                    <G scale="5" x="40" y="40" fill="none" stroke="#755ca9ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                      <Path d="M13 3H8.2C7.0799 3 6.51984 3 6.09202 3.21799C5.71569 3.40973 5.40973 3.71569 5.21799 4.09202C5 4.51984 5 5.0799 5 6.2V17.8C5 18.9201 5 19.4802 5.21799 19.908C5.40973 20.2843 5.71569 20.5903 6.09202 20.782C6.51984 21 7.0799 21 8.2 21H15.8C16.9201 21 17.4802 21 17.908 20.782C18.2843 20.5903 18.5903 20.2843 18.782 19.908C19 19.4802 19 18.9201 19 17.8V9M13 3L19 9M13 3V7.4C13 7.96005 13 8.24008 13.109 8.45399C13.2049 8.64215 13.3578 8.79513 13.546 8.89101C13.7599 9 14.0399 9 14.6 9H19M8.12695 21C8.571 19.2748 10.1371 18 12.0009 18C13.8648 18 15.4309 19.2748 15.8749 21M13 14C13 14.5523 12.5523 15 12 15C11.4477 15 11 14.5523 11 14C11 13.4477 11.4477 13 12 13C12.5523 13 13 13.4477 13 14Z" />
-                    </G>
-                  </Svg>
-                  <Text style={styles.boxText2}>New Report</Text>
-                </View>
-              </TouchableOpacity>
+            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+              <View style={[styles.box, styles.box2]}>
+                <Svg width={35} height={35} viewBox="0 0 200 200">
+                  <G scale="5" x="40" y="40" fill="none" stroke="#755ca9ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M13 3H8.2C7.0799 3 6.51984 3 6.09202 3.21799C5.71569 3.40973 5.40973 3.71569 5.21799 4.09202C5 4.51984 5 5.0799 5 6.2V17.8C5 18.9201 5 19.4802 5.21799 19.908C5.40973 20.2843 5.71569 20.5903 6.09202 20.782C6.51984 21 7.0799 21 8.2 21H15.8C16.9201 21 17.4802 21 17.908 20.782C18.2843 20.5903 18.5903 20.2843 18.782 19.908C19 19.4802 19 18.9201 19 17.8V9M13 3L19 9M13 3V7.4C13 7.96005 13 8.24008 13.109 8.45399C13.2049 8.64215 13.3578 8.79513 13.546 8.89101C13.7599 9 14.0399 9 14.6 9H19M8.12695 21C8.571 19.2748 10.1371 18 12.0009 18C13.8648 18 15.4309 19.2748 15.8749 21M13 14C13 14.5523 12.5523 15 12 15C11.4477 15 11 14.5523 11 14C11 13.4477 11.4477 13 12 13C12.5523 13 13 13.4477 13 14Z" />
+                  </G>
+                </Svg>
+                <Text style={styles.boxText2}>New Report</Text>
+              </View>
+            </TouchableOpacity>
 
-              {/* Box 3: Send Alert */}
-              <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
-                <View style={[styles.box, styles.box3]}>
-                  <Svg width={35} height={35} viewBox="0 0 200 200">
-                    <G scale="5" x="40" y="40" fill="none" stroke="#f15252ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                      <Path d="M12 10V13" />
-                      <Path d="M12 16V15.9888" />
-                      <Path d="M10.2518 5.147L3.6508 17.0287C2.91021 18.3618 3.87415 20 5.39912 20H18.6011C20.126 20 21.09 18.3618 20.3494 17.0287L13.7484 5.147C12.9864 3.77538 11.0138 3.77538 10.2518 5.147Z" />
-                    </G>
-                  </Svg>
-                  <Text style={styles.boxText3}>Send Alert</Text>
-                </View>
-              </TouchableOpacity>
+            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+              <View style={[styles.box, styles.box3]}>
+                <Svg width={35} height={35} viewBox="0 0 200 200">
+                  <G scale="5" x="40" y="40" fill="none" stroke="#f15252ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M12 10V13" />
+                    <Path d="M12 16V15.9888" />
+                    <Path d="M10.2518 5.147L3.6508 17.0287C2.91021 18.3618 3.87415 20 5.39912 20H18.6011C20.126 20 21.09 18.3618 20.3494 17.0287L13.7484 5.147C12.9864 3.77538 11.0138 3.77538 10.2518 5.147Z" />
+                  </G>
+                </Svg>
+                <Text style={styles.boxText3}>Send Alert</Text>
+              </View>
+            </TouchableOpacity>
 
-              {/* Box 4: Schedule */}
-              <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
-                <View style={[styles.box, styles.box4]}>
-                  <Svg width={35} height={35} viewBox="0 0 200 200">
-                    <G scale="0.234" x="40" y="40" fill="#727930ff">
-                      <Rect x="119.256" y="222.607" width="50.881" height="50.885" />
-                      <Rect x="341.863" y="222.607" width="50.881" height="50.885" />
-                      <Rect x="267.662" y="222.607" width="50.881" height="50.885" />
-                      <Rect x="119.256" y="302.11" width="50.881" height="50.885" />
-                      <Rect x="267.662" y="302.11" width="50.881" height="50.885" />
-                      <Rect x="193.46" y="302.11" width="50.881" height="50.885" />
-                      <Rect x="341.863" y="381.612" width="50.881" height="50.885" />
-                      <Rect x="267.662" y="381.612" width="50.881" height="50.885" />
-                      <Rect x="193.46" y="381.612" width="50.881" height="50.885" />
-                      <Path d="M439.277,55.046h-41.376v39.67c0,14.802-12.195,26.84-27.183,26.84h-54.025 c-14.988,0-27.182-12.038-27.182-26.84v-39.67h-67.094v39.297c0,15.008-12.329,27.213-27.484,27.213h-53.424 c-15.155,0-27.484-12.205-27.484-27.213V55.046H72.649c-26.906,0-48.796,21.692-48.796,48.354v360.246 c0,26.661,21.89,48.354,48.796,48.354h366.628c26.947,0,48.87-21.692,48.87-48.354V103.4 C488.147,76.739,466.224,55.046,439.277,55.046z M453.167,462.707c0,8.56-5.751,14.309-14.311,14.309H73.144 c-8.56,0-14.311-5.749-14.311-14.309V178.089h394.334V462.707z" />
-                      <Path d="M141.525,102.507h53.392c4.521,0,8.199-3.653,8.199-8.144v-73.87c0-11.3-9.27-20.493-20.666-20.493h-28.459 c-11.395,0-20.668,9.192-20.668,20.493v73.87C133.324,98.854,137.002,102.507,141.525,102.507z" />
-                      <Path d="M316.693,102.507h54.025c4.348,0,7.884-3.513,7.884-7.826V20.178C378.602,9.053,369.474,0,358.251,0H329.16 c-11.221,0-20.349,9.053-20.349,20.178v74.503C308.81,98.994,312.347,102.507,316.693,102.507z" />
-                    </G>
-                  </Svg>
-                  <Text style={styles.boxText4}>Schedule</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+              <View style={[styles.box, styles.box4]}>
+                <Svg width={35} height={35} viewBox="0 0 200 200">
+                  <G scale="0.234" x="40" y="40" fill="#727930ff">
+                    <Rect x="119.256" y="222.607" width="50.881" height="50.885" />
+                    <Rect x="341.863" y="222.607" width="50.881" height="50.885" />
+                    <Rect x="267.662" y="222.607" width="50.881" height="50.885" />
+                    <Rect x="119.256" y="302.11" width="50.881" height="50.885" />
+                    <Rect x="267.662" y="302.11" width="50.881" height="50.885" />
+                    <Rect x="193.46" y="302.11" width="50.881" height="50.885" />
+                    <Rect x="341.863" y="381.612" width="50.881" height="50.885" />
+                    <Rect x="267.662" y="381.612" width="50.881" height="50.885" />
+                    <Rect x="193.46" y="381.612" width="50.881" height="50.885" />
+                    <Path d="M439.277,55.046h-41.376v39.67c0,14.802-12.195,26.84-27.183,26.84h-54.025 c-14.988,0-27.182-12.038-27.182-26.84v-39.67h-67.094v39.297c0,15.008-12.329,27.213-27.484,27.213h-53.424 c-15.155,0-27.484-12.205-27.484-27.213V55.046H72.649c-26.906,0-48.796,21.692-48.796,48.354v360.246 c0,26.661,21.89,48.354,48.796,48.354h366.628c26.947,0,48.87-21.692,48.87-48.354V103.4 C488.147,76.739,466.224,55.046,439.277,55.046z M453.167,462.707c0,8.56-5.751,14.309-14.311,14.309H73.144 c-8.56,0-14.311-5.749-14.311-14.309V178.089h394.334V462.707z" />
+                    <Path d="M141.525,102.507h53.392c4.521,0,8.199-3.653,8.199-8.144v-73.87c0-11.3-9.27-20.493-20.666-20.493h-28.459 c-11.395,0-20.668,9.192-20.668,20.493v73.87C133.324,98.854,137.002,102.507,141.525,102.507z" />
+                    <Path d="M316.693,102.507h54.025c4.348,0,7.884-3.513,7.884-7.826V20.178C378.602,9.053,369.474,0,358.251,0H329.16 c-11.221,0-20.349,9.053-20.349,20.178v74.503C308.81,98.994,312.347,102.507,316.693,102.507z" />
+                  </G>
+                </Svg>
+                <Text style={styles.boxText4}>Schedule</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* 3. RECENT ALERTS */}
+        {/* 3. RECENT ALERTS (LIVE DATA) */}
         <SectionHeader title="Recent Alerts" />
         <View style={styles.cardContainer}>
-           <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Attention Needed</Text>
-              <TouchableOpacity><Text style={styles.viewAllText}>View All</Text></TouchableOpacity>
-           </View>
-           
-           {recentAlerts.map((alert, index) => (
-             <View key={alert.id}>
-               <View style={styles.alertRow}>
-                 <View style={[styles.iconBadge, {backgroundColor: alert.color + '15'}]}>
-                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={alert.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><Path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><Path d="M12 9v4" /><Path d="M12 17h.01" /></Svg>
-                 </View>
-                 <View style={styles.alertContent}>
-                    <Text style={styles.alertTitle}>{alert.title}</Text>
-                    <Text style={styles.alertTime}>{alert.time}</Text>
-                 </View>
-                 <View style={[styles.statusPill, {backgroundColor: alert.color}]}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>Attention Needed</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('CounselorActiveAlerts')}>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recentAlerts.length === 0 ? (
+            <View style={{padding: 20, alignItems: 'center'}}>
+              <Text style={{color: '#9CA3AF', fontSize: 14}}>No active alerts.</Text>
+            </View>
+          ) : (
+            recentAlerts.map((alert, index) => (
+              <View key={alert.id}>
+                <View style={styles.alertRow}>
+                  <View
+                    style={[
+                      styles.iconBadge,
+                      {backgroundColor: alert.color + '15'}, // Light background based on severity
+                    ]}>
+                    <Svg
+                      width={20}
+                      height={20}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={alert.color}
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round">
+                      <Path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <Path d="M12 9v4" />
+                      <Path d="M12 17h.01" />
+                    </Svg>
+                  </View>
+                  <View style={styles.alertContent}>
+                    <Text style={styles.alertTitle}>
+                      {alert.studentName} has a low score ({alert.score})
+                    </Text>
+                    <Text style={styles.alertTime}>{alert.timeAgo}</Text>
+                  </View>
+                  <View
+                    style={[styles.statusPill, {backgroundColor: alert.color}]}>
                     <Text style={styles.statusText}>{alert.status}</Text>
-                 </View>
-               </View>
-               {index < recentAlerts.length - 1 && <View style={styles.divider} />}
-             </View>
-           ))}
+                  </View>
+                </View>
+                {index < recentAlerts.length - 1 && (
+                  <View style={styles.divider} />
+                )}
+              </View>
+            ))
+          )}
         </View>
 
         {/* 4. TODAY'S SCHEDULE */}
         <SectionHeader title="Today's Agenda" />
         <View style={styles.cardContainer}>
           <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>Upcoming Sessions</Text>
-              <TouchableOpacity><Text style={styles.viewAllText}>Calendar</Text></TouchableOpacity>
-           </View>
-          
-          {todaysSchedule.map((item) => (
+            <Text style={styles.cardTitle}>Upcoming Sessions</Text>
+            <TouchableOpacity>
+              <Text style={styles.viewAllText}>Calendar</Text>
+            </TouchableOpacity>
+          </View>
+
+          {todaysSchedule.map(item => (
             <View key={item.id} style={styles.scheduleItem}>
               <View style={styles.timeColumn}>
                 <Text style={styles.startTime}>{item.time}</Text>
                 <Text style={styles.endTime}>{item.endTime}</Text>
               </View>
-              <View style={[styles.scheduleCard, {borderLeftColor: item.color}]}>
+              <View
+                style={[styles.scheduleCard, {borderLeftColor: item.color}]}>
                 <Text style={styles.scheduleTitle}>{item.title}</Text>
                 <Text style={styles.scheduleSubtitle}>{item.subtitle}</Text>
               </View>
@@ -309,41 +407,98 @@ const CounselorDashboard = ({navigation}: Props) => {
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutButtonText}>Sign Out</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </View>
   );
 };
 
-// --- HELPER COMPONENTS ---
+// --- HELPERS ---
+
+// Helper to calculate "Time Ago"
+const formatTimeAgo = (timestamp: any) => {
+  if (!timestamp) return 'Just now';
+  
+  const now = new Date();
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  let interval = seconds / 31536000;
+  if (interval > 1) return Math.floor(interval) + ' years ago';
+  
+  interval = seconds / 2592000;
+  if (interval > 1) return Math.floor(interval) + ' months ago';
+  
+  interval = seconds / 86400;
+  if (interval > 1) return Math.floor(interval) + ' days ago';
+  
+  interval = seconds / 3600;
+  if (interval > 1) return Math.floor(interval) + ' hours ago';
+  
+  interval = seconds / 60;
+  if (interval > 1) return Math.floor(interval) + ' mins ago';
+  
+  return 'Just now';
+};
 
 const SectionHeader = ({title}: {title: string}) => (
   <View style={styles.sectionHeaderContainer}>
     <Text style={styles.sectionHeaderText}>{title}</Text>
   </View>
 );
-
-const StatCard = ({label, value, subLabel, icon, color, isWarning, onPress}: any) => (
-  <TouchableOpacity 
-    style={styles.statCard} 
+const StatCard = ({
+  label,
+  value,
+  subLabel,
+  icon,
+  color,
+  isWarning,
+  applyColorToValue,
+  onPress,
+}: any) => (
+  <TouchableOpacity
+    style={styles.statCard}
     activeOpacity={0.7}
-    onPress={onPress}
-  >
+    onPress={onPress}>
     <View style={[styles.statHeader]}>
       <View style={[styles.iconBadge, {backgroundColor: color + '15'}]}>
-        <Image 
-          source={icon} 
-          style={{width: 22, height: 22}} // <--- tintColor removed
-          resizeMode="contain" 
+        <Image
+          source={icon}
+          style={{width: 22, height: 22}}
+          resizeMode="contain"
         />
       </View>
       {isWarning && <View style={styles.redDot} />}
     </View>
-    <Text style={[styles.statValue, {color: isWarning ? color : '#1F2937'}]}>{value}</Text>
+    
+    <Text 
+      style={[
+        styles.statValue, 
+        {color: isWarning || applyColorToValue ? color : '#1F2937'} 
+      ]}
+    >
+      {value}
+    </Text>
+    
     <Text style={styles.statLabel}>{label}</Text>
     <Text style={styles.statSubLabel}>{subLabel}</Text>
   </TouchableOpacity>
 );
+
+const getWellnessLabel = (score: number | null) => {
+  if (score === null) return 'No Data';
+  if (score >= 80) return 'Excellent';
+  if (score >= 60) return 'Good';
+  if (score >= 40) return 'Stable';
+  return 'At Risk';
+};
+
+const getLabelColor = (score: number | null) => {
+  if (score === null) return '#9CA3AF'; // Grey
+  if (score >= 80) return '#10B981'; // Green
+  if (score >= 60) return '#3B82F6'; // Blue
+  if (score >= 40) return '#F59E0B'; // Orange
+  return '#EF4444'; // Red
+};
 
 // --- STYLES ---
 const styles = StyleSheet.create({
@@ -356,7 +511,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 40,
   },
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -394,7 +548,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  // Section Headers
   sectionHeaderContainer: {
     marginTop: 24,
     marginBottom: 12,
@@ -407,7 +560,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  // Stats Grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -458,7 +610,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#EF4444',
   },
-  // Generic Card Style (Used for Quick Actions, Alerts, Schedule)
   cardContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
@@ -485,8 +636,6 @@ const styles = StyleSheet.create({
     color: '#8B5CF6',
     fontWeight: '600',
   },
-
-  // --- Original Quick Actions Styles ---
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -497,8 +646,8 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   box: {
-    height: 90, // Slightly taller for better touch area
-    borderRadius: 16, // Softer corners
+    height: 90, 
+    borderRadius: 16, 
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
@@ -535,8 +684,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-
-  // Alerts Styles
   alertRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -547,12 +694,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   alertTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#374151',
+    lineHeight: 18,
   },
   alertTime: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#9CA3AF',
     marginTop: 2,
   },
@@ -572,7 +720,6 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     marginLeft: 52,
   },
-  // Schedule Styles
   scheduleItem: {
     flexDirection: 'row',
     marginBottom: 12,
@@ -609,7 +756,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B7280',
   },
-  // Sign Out
   signOutButton: {
     marginTop: 20,
     backgroundColor: '#FFFFFF',
