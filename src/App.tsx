@@ -27,6 +27,8 @@ import CounselorActiveAlerts from './Screens/CounselorActiveAlerts';
 import SendAlerts from './Screens/SendAlert';
 import NotificationsScreen from './Screens/NotificationsScreens';
 import MoodAndEmotionCounselor from './Screens/MoodAndEmotionCounselor';
+import ScheduleScreen from './Screens/Schedule';
+import ScheduleLogScreen from './Screens/ScheduleLog';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
@@ -331,6 +333,38 @@ const App = () => {
               }}
               name="AnxietyRisk"
               component={AnxietyRisk}
+            />
+            <Stack.Screen
+              options={{
+                headerShown: false,
+                title: 'Schedule',
+                headerStyle: {
+                  backgroundColor: '#DBEAFE', // Light Cyan Background
+                },
+                // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
+                headerTintColor: '#1E40AF',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+              name="Schedule"
+              component={ScheduleScreen}
+            />
+              <Stack.Screen
+              options={{
+                headerShown: false,
+                title: 'Schedule Log',
+                headerStyle: {
+                  backgroundColor: '#DBEAFE', // Light Cyan Background
+                },
+                // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
+                headerTintColor: '#1E40AF',
+                headerTitleStyle: {
+                  fontWeight: 'bold',
+                },
+              }}
+              name="ScheduleLog"
+              component={ScheduleLogScreen}
             />
           </Stack.Group>
         )}

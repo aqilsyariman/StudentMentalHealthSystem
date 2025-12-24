@@ -25,5 +25,6 @@ export type RootStackParamList = {
   SendAlerts: undefined;
   NotificationsScreen: undefined;
   MoodAndEmotionCounselor: undefined;
-
+  Schedule: undefined;
+ScheduleLog: undefined;
 };

@@ -306,16 +306,17 @@ const CounselorDashboard = ({navigation}: Props) => {
           <StatCard
             label="Active Alerts"
             value={atRiskCount !== null ? atRiskCount : '-'}
-            subLabel="Students at risk"
+            subLabel="HR • Sleep • Steps • BP"
             icon={require('../Assets/warning.png')}
-            color="#EF4444"
+            color="#ffbc33"
             isWarning={atRiskCount !== null && atRiskCount > 0}
             applyColorToValue={true}
             onPress={() => navigation.navigate('CounselorActiveAlerts')}
           />
           <StatCard
-            label="Avg Wellness"
+            label="Average Wellness"
             value={avgWellnessScore !== null ? avgWellnessScore : '--'}
+            unit="/100"
             subLabel={getWellnessLabel(avgWellnessScore)}
             icon={require('../Assets/services.png')}
             color={getLabelColor(avgWellnessScore)}
@@ -327,11 +328,12 @@ const CounselorDashboard = ({navigation}: Props) => {
             value="5"
             subLabel="Today"
             icon={require('../Assets/schedule.png')}
-            color="#F59E0B"
+            color="#2a428c"
+            onPress={() => navigation.navigate('ScheduleLog')}
           />
         </View>
 
-        {/* 2. MOOD & EMOTIONS SECTION (UPDATED) */}
+
         {/* 2. MOOD & EMOTIONS SECTION (COMBINED) */}
         <SectionHeader title="Mood & Emotions" />
         <View style={styles.statsGrid}>
@@ -339,22 +341,35 @@ const CounselorDashboard = ({navigation}: Props) => {
             style={styles.moodCard} // New style
             activeOpacity={0.7}
             onPress={() => navigation.navigate('MoodAndEmotionCounselor')}>
-            
             {/* Header part of card */}
             <View style={styles.moodHeaderRow}>
-              <View style={[styles.iconBadge, {backgroundColor: '#8B5CF615'}]}>
+              <View style={[styles.iconBadge, {backgroundColor: '#e3e1e915'}]}>
                 <Image
-                  source={require('../Assets/services.png')} 
-                  style={{width: 22, height: 22}}
+                  source={require('../Assets/test.png')}
+                  style={{width: 40, height: 40}}
                   resizeMode="contain"
                 />
               </View>
               <View style={{flex: 1, marginLeft: 12}}>
-                <Text style={styles.cardTitle}>Psychological Risk Assessment</Text>
-                <Text style={styles.statSubLabel}>Anxiety and Depression Evaluation</Text>
+                <Text style={styles.cardTitle}>
+                  Psychological Risk Assessment
+                </Text>
+                <Text style={styles.statSubLabel}>
+                  Anxiety and Depression Evaluation
+                </Text>
               </View>
-              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={2}>
-                <Path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+              <Svg
+                width={20}
+                height={20}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#9CA3AF"
+                strokeWidth={2}>
+                <Path
+                  d="M9 18l6-6-6-6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </Svg>
             </View>
 
@@ -453,7 +468,7 @@ const CounselorDashboard = ({navigation}: Props) => {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7} onPress={() => navigation.navigate('Schedule')}>
               <View style={[styles.box, styles.box4]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
                   <G scale="0.234" x="40" y="40" fill="#727930ff">
@@ -651,6 +666,7 @@ const SectionHeader = ({title}: {title: string}) => (
 const StatCard = ({
   label,
   value,
+  unit,
   subLabel,
   icon,
   color,
@@ -672,15 +688,18 @@ const StatCard = ({
       </View>
       {isWarning && <View style={styles.redDot} />}
     </View>
-
-    <Text
-      style={[
-        styles.statValue,
-        {color: isWarning || applyColorToValue ? color : '#1F2937'},
-      ]}>
-      {value}
-    </Text>
-
+    <View style={[
+          styles.statValueContainer,
+        ]}>
+      <Text
+        style={[
+          styles.statValue,
+          {color: isWarning || applyColorToValue ? color : '#1F2937'},
+        ]}>
+        {value}
+      </Text>
+      {unit && <Text style={styles.statUnit}>{unit}</Text>}
+    </View>
     <Text style={styles.statLabel}>{label}</Text>
     <Text style={styles.statSubLabel}>{subLabel}</Text>
   </TouchableOpacity>
@@ -784,12 +803,24 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  statUnit: {
+    fontSize: 15,
+    color: '#9CA3AF',
+    marginLeft: 4,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
   iconBadge: {
     width: 40,
     height: 40,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  statValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 4,
   },
   statValue: {
     fontSize: 24,
