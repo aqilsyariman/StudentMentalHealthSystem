@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,17 @@ import {
   TouchableOpacity,
   Alert,
   StatusBar,
+  Animated,
+  Dimensions,
+  Easing,
+  ViewStyle,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import Svg, {Path} from 'react-native-svg';
+import Svg, {Path, Defs, LinearGradient, Stop} from 'react-native-svg';
 
-// --- ICONS (Styled to match new UI) ---
+const {width} = Dimensions.get('window');
+
+// --- ICONS ---
 const HeartIcon = ({size = 32, color = '#FF6F61'}) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
@@ -32,12 +38,121 @@ const BmiIcon = ({size = 32, color = '#10B981'}) => (
     <Path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 12h-2v-6h2v6zm0-8h-2V5h2v2z" />
   </Svg>
 );
+const BackIcon = ({size = 24, color = '#FFFFFF'}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M15 18l-6-6 6-6" />
+  </Svg>
+);
 
 const TrashIcon = ({color = '#FFFFFF', size = 20}) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
     <Path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
   </Svg>
 );
+
+// --- ANIMATED COMPONENTS ---
+
+interface PulsingViewProps {
+  children: React.ReactNode;
+  interval?: number;
+}
+
+const PulsingView: React.FC<PulsingViewProps> = ({children, interval = 1000}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.2,
+          duration: 150,
+          useNativeDriver: true,
+          easing: Easing.ease,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+          easing: Easing.ease,
+        }),
+        Animated.delay(interval),
+      ]),
+    ).start();
+  }, [interval, scaleAnim]);
+
+  return (
+    <Animated.View style={{transform: [{scale: scaleAnim}]}}>
+      {children}
+    </Animated.View>
+  );
+};
+
+interface SlideUpCardProps {
+  children: React.ReactNode;
+  delay?: number;
+  onPress?: () => void;
+  style?: ViewStyle;
+}
+
+const SlideUpCard: React.FC<SlideUpCardProps> = ({children, delay = 0, onPress, style}) => {
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        delay: delay,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        delay: delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [delay, fadeAnim, slideAnim]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  // If onPress is provided, wrap in TouchableOpacity; otherwise just View
+  const Container = onPress ? TouchableOpacity : View;
+
+  return (
+    <Animated.View
+      style={[
+        {
+          opacity: fadeAnim,
+          transform: [{translateY: slideAnim}, {scale: scaleAnim}],
+        },
+        style,
+      ]}>
+      <Container
+        activeOpacity={1}
+        onPress={onPress}
+        onPressIn={onPress ? handlePressIn : undefined}
+        onPressOut={onPress ? handlePressOut : undefined}>
+        {children}
+      </Container>
+    </Animated.View>
+  );
+};
 
 // --- TYPES & HELPERS ---
 type Student = {
@@ -63,7 +178,9 @@ const getLatestSensorValue = (sensorDoc: any) => {
     if (docData && docData.data) {
       const data = docData.data;
       const dateKeys = Object.keys(data);
-      if (dateKeys.length === 0) return null;
+      if (dateKeys.length === 0) {
+        return null;
+      }
       dateKeys.sort().reverse();
       const latestDateKey = dateKeys[0];
       const readingsArray = data[latestDateKey];
@@ -183,47 +300,83 @@ const StudentDetail = ({route, navigation}: any) => {
 
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp || typeof timestamp.toDate !== 'function') {
-      if (typeof timestamp === 'string') {
-        return new Date(timestamp).toLocaleString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          month: 'short',
-          day: 'numeric',
-        });
-      }
       return 'No recent data';
     }
+    // Updated to show Date + Time (e.g., "Dec 25, 5:16 PM")
     return timestamp.toDate().toLocaleString([], {
+      month: 'short',   // Adds "Dec"
+      day: 'numeric',   // Adds "25"
       hour: '2-digit',
       minute: '2-digit',
-      month: 'short',
-      day: 'numeric',
     });
   };
 
   if (loading) {
     return (
       <View style={[styles.fullContainer, styles.centerContainer]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
         <ActivityIndicator size="large" color="#FF6F61" />
-        <Text style={styles.loadingText}>Loading Student Details...</Text>
-      </View>
-    );
-  }
-  if (error) {
-    return (
-      <View style={[styles.fullContainer, styles.centerContainer]}>
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.loadingText}>Syncing Vitals...</Text>
       </View>
     );
   }
 
+  if (error) {
+    return (
+      <View style={[styles.fullContainer, styles.centerContainer]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+        <Text style={{color: '#EF4444', fontSize: 16, fontWeight: 'bold'}}>{error}</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{marginTop: 20}}>
+          <Text style={{color: '#3b5998'}}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // --- RENDERING ---
   return (
     <View style={styles.fullContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F0F2F5" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* --- Profile Header --- */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => navigation.goBack()}
+        activeOpacity={0.7}
+      >
+        <BackIcon size={24} color="#FFF" />
+      </TouchableOpacity>
+
+      {/* --- CUSTOM CURVED HEADER BACKGROUND --- */}
+     <View style={styles.headerBackground}>
+        <Svg
+          height="100%"
+          width={width}
+          viewBox={`0 0 ${width} 350`} // Update viewbox height
+          preserveAspectRatio="none">
+          <Defs>
+            <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor="#4c669f" stopOpacity="1" />
+              <Stop offset="1" stopColor="#3b5998" stopOpacity="1" />
+            </LinearGradient>
+          </Defs>
+          <Path
+            fill="url(#grad)"
+            // Deepened the curve: Sides are now 250, Center curve is 330
+            d={`M0,0 L${width},0 L${width},250 Q${width / 2},330 0,250 Z`}
+          />
+        </Svg>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}>
+
+        {/* --- PROFILE SECTION --- */}
+        <Animated.View style={styles.profileSection}>
+          <View style={styles.avatarWrapper}>
             <Image
               style={styles.avatar}
               source={{
@@ -232,306 +385,364 @@ const StudentDetail = ({route, navigation}: any) => {
                   `https://i.pravatar.cc/150?u=${student?.email}`,
               }}
             />
+            {/* Online Status Dot */}
+            <View style={styles.statusDot} />
           </View>
           <Text style={styles.studentName}>{student?.fullName}</Text>
           <Text style={styles.studentEmail}>{student?.email}</Text>
-        </View>
+        </Animated.View>
 
-        <Text style={styles.sectionTitle}>Live Sensor Data</Text>
+        <Text style={styles.sectionHeader}>LIVE METRICS</Text>
 
-        {/* --- Heart Rate Card (Red Theme) --- */}
-        <TouchableOpacity
-          activeOpacity={0.8}
+        {/* --- CARD 1: HEART RATE (With Pulse Animation) --- */}
+        <SlideUpCard
+          delay={100}
           onPress={() => navigation.navigate('HeartRateGraph', {studentId})}
-          style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, {color: '#FF6F61'}]}>
-              Heart Rate
-            </Text>
-            <Text style={styles.tapLabel}>Tap for history ›</Text>
-          </View>
-
-          <View style={styles.sensorCardContainer}>
-            <View
-              style={[
-                styles.iconContainer,
-                {backgroundColor: '#FF6F61' + '15'},
-              ]}>
-              <HeartIcon size={42} color="#FF6F61" />
+          style={styles.cardWrapper}>
+          <View style={[styles.cardInner, styles.cardHeart]}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.iconCircleHeart}>
+                <PulsingView interval={800}>
+                  <HeartIcon size={28} color="#FF6F61" />
+                </PulsingView>
+              </View>
+              <Text style={styles.timestampBadge}>
+                {formatTimestamp(sensorData?.heartRateTimestamp)}
+              </Text>
             </View>
-            <View style={styles.sensorTextContainer}>
-              <Text style={styles.sensorValue}>
+            <View style={styles.valueContainer}>
+              <Text style={styles.bigValue}>
                 {sensorData?.heartRate || '--'}
-                <Text style={styles.sensorUnit}> BPM</Text>
               </Text>
-              <Text style={styles.sensorTimestamp}>
-                Updated: {formatTimestamp(sensorData?.heartRateTimestamp)}
-              </Text>
+              <Text style={styles.unitLabel}>BPM</Text>
             </View>
+            <Text style={styles.subText}>Tap to view history &rarr;</Text>
           </View>
-        </TouchableOpacity>
+        </SlideUpCard>
 
-        {/* --- Steps Card (Purple Theme) --- */}
-        <TouchableOpacity
-          activeOpacity={0.8}
+        {/* --- CARD 2: STEPS --- */}
+        <SlideUpCard
+          delay={250}
           onPress={() => navigation.navigate('StepsGraph', {studentId})}
-          style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, {color: '#6f5be1'}]}>Activity</Text>
-            <Text style={styles.tapLabel}>Tap for history ›</Text>
-          </View>
-
-          <View style={styles.sensorCardContainer}>
-            <View
-              style={[
-                styles.iconContainer,
-                {backgroundColor: '#6f5be1' + '15'},
-              ]}>
-              <StepIcon size={42} color="#6f5be1" />
+          style={styles.cardWrapper}>
+          <View style={[styles.cardInner, styles.cardSteps]}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.iconCircleSteps}>
+                <StepIcon size={28} color="#6f5be1" />
+              </View>
+              <Text style={styles.timestampBadge}>
+                {formatTimestamp(sensorData?.stepCountTimestamp)}
+              </Text>
             </View>
-            <View style={styles.sensorTextContainer}>
-              <Text style={styles.sensorValue}>
+            <View style={styles.valueContainer}>
+              <Text style={styles.bigValue}>
                 {sensorData?.stepCount || '--'}
-                <Text style={styles.sensorUnit}> Steps</Text>
               </Text>
-              <Text style={styles.sensorTimestamp}>
-                Updated: {formatTimestamp(sensorData?.stepCountTimestamp)}
-              </Text>
+              <Text style={styles.unitLabel}>Steps</Text>
             </View>
+            <Text style={styles.subText}>Activity Analysis &rarr;</Text>
           </View>
-        </TouchableOpacity>
+        </SlideUpCard>
 
-        {/* --- BMI Card (Green Theme) --- */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, {color: '#10B981'}]}>
-              Body Metrics
-            </Text>
-          </View>
-
-          <View style={styles.sensorCardContainer}>
-            <View
-              style={[
-                styles.iconContainer,
-                {backgroundColor: '#10B981' + '15'},
-              ]}>
-              <BmiIcon size={42} color="#10B981" />
+        {/* --- CARD 3: BMI / METRICS --- */}
+        <SlideUpCard delay={400} style={styles.cardWrapper}>
+          <View style={[styles.cardInner, styles.cardBmi]}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.iconCircleBmi}>
+                <BmiIcon size={28} color="#10B981" />
+              </View>
+              <Text style={styles.headerLabel}>Physical Stats</Text>
             </View>
-            <View style={styles.sensorTextContainer}>
-              <View style={styles.bmiRow}>
-                <Text style={styles.sensorUnitSmall}>Height</Text>
-                <Text style={styles.sensorValueSmall}>
-                  {sensorData?.height || '--'} cm
+
+            <View style={styles.metricsRow}>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Weight</Text>
+                <Text style={styles.metricValue}>
+                  {sensorData?.weight || '--'} <Text style={styles.metricUnit}>kg</Text>
                 </Text>
               </View>
-              <View style={styles.bmiRow}>
-                <Text style={styles.sensorUnitSmall}>Weight</Text>
-                <Text style={styles.sensorValueSmall}>
-                  {sensorData?.weight || '--'} kg
+              <View style={styles.dividerVertical} />
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Height</Text>
+                <Text style={styles.metricValue}>
+                  {sensorData?.height || '--'} <Text style={styles.metricUnit}>cm</Text>
                 </Text>
               </View>
             </View>
           </View>
-        </View>
+        </SlideUpCard>
 
-        {/* --- Delete Button --- */}
+        {/* --- DELETE BUTTON --- */}
         {student?.counselorId && (
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleRemoveStudent}
-            disabled={deleting}
-            activeOpacity={0.8}>
-            {deleting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <TrashIcon color="#FFFFFF" size={20} />
-                <Text style={styles.deleteButtonText}>Remove Student</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <SlideUpCard delay={550}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleRemoveStudent}
+              disabled={deleting}>
+              {deleting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <TrashIcon color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.deleteText}>Remove from List</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </SlideUpCard>
         )}
+
+        <View style={{height: 40}} />
       </ScrollView>
     </View>
   );
 };
 
-// --- STYLES (Matching HeartRateGraph UI) ---
+// --- STYLES ---
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: '#F0F2F5', // Neutral background to let cards pop
-  },
-  scrollContainer: {
-    padding: 20,
-    paddingBottom: 80,
+    backgroundColor: '#F8F9FA', // Very light gray background
   },
   centerContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 15,
     fontSize: 16,
-    color: '#FF6F61',
+    color: '#3b5998',
     fontWeight: '600',
   },
-  errorText: {
-    fontSize: 16,
-    color: '#FF6F61',
-    fontWeight: '600',
+
+  // Header
+  headerBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 360,
+    zIndex: 0,
   },
-  // --- Profile Header ---
-  profileHeader: {
+  scrollContainer: {
+    paddingTop: 100, // Push content down to show the curve
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+
+  // Profile
+  profileSection: {
     alignItems: 'center',
-    marginBottom: 24,
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    marginBottom: 50,
   },
-  avatarContainer: {
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderRadius: 60,
-    marginBottom: 16,
+    shadowOffset: {width: 0, height: 10},
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     borderWidth: 4,
-    borderColor: '#FFFFFF',
+    borderColor: '#FFF',
+  },
+  statusDot: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#10B981',
+    borderWidth: 3,
+    borderColor: '#FFF',
   },
   studentName: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#1F2937',
+    color: '#FFFFFF', // White text against the blue curve
     marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.1)',
+    textShadowOffset: {width: 0, height: 2},
+    textShadowRadius: 4,
   },
   studentEmail: {
-    fontSize: 15,
-    color: '#6B7280',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
     fontWeight: '500',
   },
-  sectionTitle: {
-    fontSize: 14,
+
+  sectionHeader: {
+    fontSize: 13,
     fontWeight: '700',
     color: '#9CA3AF',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 15,
+    letterSpacing: 1.2,
+    marginLeft: 5,
+  },
+
+  // Cards
+  cardWrapper: {
     marginBottom: 16,
-    marginLeft: 8,
+    borderRadius: 24,
+    backgroundColor: '#FFF',
+    shadowColor: '#3b5998',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6, // Android shadow
   },
-  // --- Cards ---
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+  cardInner: {
     padding: 24,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 4,
+    borderRadius: 24,
   },
-  cardHeader: {
+  // Color stripes or slight tinting
+  cardHeart: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#FF6F61',
+  },
+  cardSteps: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#6f5be1',
+  },
+  cardBmi: {
+    borderLeftWidth: 6,
+    borderLeftColor: '#10B981',
+  },
+
+  cardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  iconCircleHeart: {
+    width: 48, height: 48, borderRadius: 16,
+    backgroundColor: 'rgba(255, 111, 97, 0.1)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  tapLabel: {
-    fontSize: 12,
-    color: '#9CA3AF',
+  iconCircleSteps: {
+    width: 48, height: 48, borderRadius: 16,
+    backgroundColor: 'rgba(111, 91, 225, 0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  iconCircleBmi: {
+    width: 48, height: 48, borderRadius: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  timestampBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 11,
+    color: '#6B7280',
     fontWeight: '600',
+    overflow: 'hidden',
   },
-  sensorCardContainer: {
+
+  // Values
+  valueContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
+    alignItems: 'baseline',
+    marginBottom: 4,
   },
-  iconContainer: {
-    padding: 16,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sensorTextContainer: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  sensorValue: {
-    fontSize: 36,
+  bigValue: {
+    fontSize: 48,
     fontWeight: '900',
     color: '#1F2937',
-    letterSpacing: -1,
+    letterSpacing: -2,
+    includeFontPadding: false,
   },
-  sensorUnit: {
+  unitLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  sensorTimestamp: {
-    fontSize: 12,
     color: '#9CA3AF',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  subText: {
+    fontSize: 13,
+    color: '#3b5998',
+    fontWeight: '600',
     marginTop: 4,
-    fontWeight: '500',
   },
-  // --- BMI Specific ---
-  bmiRow: {
+  headerLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#374151',
+  },
+
+  // BMI Specific
+  metricsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    marginBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    paddingBottom: 6,
+    marginTop: 10,
   },
-  sensorValueSmall: {
-    fontSize: 18,
+  metricItem: {
+    alignItems: 'center',
+  },
+  metricLabel: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 4,
+    fontWeight: '600',
+  },
+  metricValue: {
+    fontSize: 24,
     fontWeight: '800',
     color: '#374151',
   },
-  sensorUnitSmall: {
+  metricUnit: {
     fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
-  // --- Delete Button ---
+  dividerVertical: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#F3F4F6',
+  },
+
+  // Buttons
   deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#EF4444',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 18,
-    paddingHorizontal: 20,
     borderRadius: 16,
-    gap: 8,
     marginTop: 10,
-    marginBottom: 20,
     shadowColor: '#EF4444',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.3,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 8,
   },
-  deleteButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  deleteText: {
+    color: '#FFF',
     fontWeight: '700',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60, // Clear the status bar/dynamic island
+    left: 20,
+    zIndex: 50, // Ensure it's clickable above the background
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Glass effect
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
 });
 

@@ -19,7 +19,7 @@ import HeartRateGraph from './Screens/GraphScreen/HeartRateGraph';
 import StepsGraph from './Screens/GraphScreen/StepsGraph';
 import ManualSleepTracker from './Screens/ManualSleepTracker';
 import Messages from './Screens/Messages';
-import CounselorStudentList from './Screens/CounselorStudentList';
+import CounselorStudentNewChat from './Screens/CounselorStudentNewChat';
 import ChatScreen from './Screens/ChatScreen';
 import HealthScoreScreen from './Screens/GraphScreen/HealthScoreScreen';
 import AvgWellnessCounselor from './Screens/AvgWellnessCounselor';
@@ -190,7 +190,7 @@ const App = () => {
               component={ManualSleepTracker}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Messages'}}
+              options={{headerShown: false, title: 'Messages'}}
               name="Messages"
               component={Messages}
             />
@@ -224,7 +224,7 @@ const App = () => {
             />
             <Stack.Screen
               options={{
-                headerShown: true,
+                headerShown: false,
                 title: 'Student Details',
                 headerStyle: {
                   backgroundColor: '#F0F2F5', // Your color here
@@ -267,14 +267,14 @@ const App = () => {
               component={StepsGraph}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Messages'}}
+              options={{headerShown: false, title: 'Messages'}}
               name="Messages"
               component={Messages}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'CounselorStudentList'}}
-              name="CounselorStudentList"
-              component={CounselorStudentList}
+              options={{headerShown: false, title: 'New Conversation'}}
+              name="CounselorStudentNewChat"
+              component={CounselorStudentNewChat}
             />
             <Stack.Screen
               options={{headerShown: false, title: 'ChatScreen'}}
@@ -292,7 +292,7 @@ const App = () => {
               component={CounselorActiveAlerts}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Send Alerts'}}
+              options={{headerShown: false, title: 'Send Alerts'}}
               name="SendAlerts"
               component={SendAlerts}
             />

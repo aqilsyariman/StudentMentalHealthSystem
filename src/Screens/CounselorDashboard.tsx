@@ -9,7 +9,10 @@ import {
   Image,
   StatusBar,
 } from 'react-native';
-import Svg, {Path, G, Rect} from 'react-native-svg';
+import Svg, {Path, G, Rect,Defs,
+  RadialGradient,
+  Stop,
+  Ellipse,} from 'react-native-svg';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import {useFocusEffect} from '@react-navigation/native';
@@ -27,24 +30,17 @@ interface AlertItem {
   timeAgo: string;
 }
 
-const todaysSchedule = [
-  {
-    id: '1',
-    time: '10:30 AM',
-    endTime: '11:30 AM',
-    title: 'Meeting with Student A',
-    subtitle: 'Virtual • Anxiety Check-in',
-    color: '#3B82F6',
-  },
-  {
-    id: '2',
-    time: '02:00 PM',
-    endTime: '03:00 PM',
-    title: 'Group Therapy B',
-    subtitle: 'Room 304 • Stress Management',
-    color: '#8B5CF6',
-  },
-];
+// 1. New Interface for Schedule
+interface ScheduleItem {
+  id: string;
+  title: string;
+  studentName: string;
+  place: string;
+  meetingWith: 'Counselor' | 'Doctor' | 'Other';
+  startTime: any;
+  endTime: any;
+  color: string;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CounselorDashboard'>;
 
@@ -54,13 +50,14 @@ const CounselorDashboard = ({navigation}: Props) => {
   const [avgWellnessScore, setAvgWellnessScore] = useState<number | null>(null);
   const [atRiskCount, setAtRiskCount] = useState<number | null>(null);
   const [recentAlerts, setRecentAlerts] = useState<AlertItem[]>([]);
+  const [highRiskMoodCount, setHighRiskMoodCount] = useState<number | null>(null);
 
-  // 1. NEW STATE for Mood High Risk Count
-  const [highRiskMoodCount, setHighRiskMoodCount] = useState<number | null>(
-    null,
-  );
+  // 2. New State for Schedules
+  const [todaysSchedules, setTodaysSchedules] = useState<ScheduleItem[]>([]);
 
   // --- DATA FETCHING ---
+
+  // ... (Existing Student Count Fetcher) ...
   const fetchStudentCount = async (currentCounselorId: string) => {
     try {
       const snapshot = await firestore()
@@ -68,7 +65,7 @@ const CounselorDashboard = ({navigation}: Props) => {
         .where('counselorId', '==', currentCounselorId)
         .get();
       setActiveStudents(snapshot.size);
-      return snapshot.docs; // Return docs to be used by risk calculator
+      return snapshot.docs;
     } catch (error) {
       console.error('Error fetching student count: ', error);
       setActiveStudents(0);
@@ -76,58 +73,35 @@ const CounselorDashboard = ({navigation}: Props) => {
     }
   };
 
-  // 2. NEW FUNCTION: Calculate High Risk based on Mental Health Scores
+  // ... (Existing Mood Risk Calculator) ...
   const fetchMoodRiskStats = async (studentDocs: any[]) => {
     let riskCounter = 0;
-
     try {
-      // We use Promise.all to fetch data in parallel for speed
       const promises = studentDocs.map(async doc => {
         let anxietyScore = 0;
         let depressionScore = 0;
 
-        // Fetch Anxiety
-        const anxietyDoc = await firestore()
-          .collection('students')
-          .doc(doc.id)
-          .collection('questionnaire')
-          .doc('anxietyRisk')
-          .get();
-
+        const anxietyDoc = await firestore().collection('students').doc(doc.id).collection('questionnaire').doc('anxietyRisk').get();
         if (anxietyDoc.exists()) {
           const data = anxietyDoc.data()?.data || {};
           const keys = Object.keys(data).sort().reverse();
           if (keys.length > 0) {
             const entries = data[keys[0]];
-            if (entries && entries.length > 0) {
-              anxietyScore = entries[entries.length - 1].score || 0;
-            }
+            if (entries && entries.length > 0) anxietyScore = entries[entries.length - 1].score || 0;
           }
         }
 
-        // Fetch Depression
-        const depressionDoc = await firestore()
-          .collection('students')
-          .doc(doc.id)
-          .collection('questionnaire')
-          .doc('depressionRisk')
-          .get();
-
+        const depressionDoc = await firestore().collection('students').doc(doc.id).collection('questionnaire').doc('depressionRisk').get();
         if (depressionDoc.exists()) {
           const data = depressionDoc.data()?.data || {};
           const keys = Object.keys(data).sort().reverse();
           if (keys.length > 0) {
             const entries = data[keys[0]];
-            if (entries && entries.length > 0) {
-              depressionScore = entries[entries.length - 1].score || 0;
-            }
+            if (entries && entries.length > 0) depressionScore = entries[entries.length - 1].score || 0;
           }
         }
 
-        // Check Risk Thresholds (Anxiety > 14 OR Depression > 19)
-        if (anxietyScore > 14 || depressionScore > 19) {
-          return 1; // Return 1 if at risk
-        }
+        if (anxietyScore > 14 || depressionScore > 19) return 1;
         return 0;
       });
 
@@ -140,42 +114,31 @@ const CounselorDashboard = ({navigation}: Props) => {
     }
   };
 
+  // ... (Existing Name Fetcher) ...
   const fetchCounselorName = async (currentCounselorId: string) => {
     if (!currentCounselorId) {
       setCounselorName('Guest');
       return;
     }
     try {
-      const counselorDocument = await firestore()
-        .collection('counselors')
-        .doc(currentCounselorId)
-        .get();
-
+      const counselorDocument = await firestore().collection('counselors').doc(currentCounselorId).get();
       if (!counselorDocument.exists) {
         setCounselorName('Unknown Counselor');
         return;
       }
       const data = counselorDocument.data();
-      if (data && data.fullName) {
-        setCounselorName(data.fullName);
-      } else {
-        setCounselorName('Name Missing');
-      }
+      if (data && data.fullName) setCounselorName(data.fullName);
+      else setCounselorName('Name Missing');
     } catch (error) {
       console.error('Error fetching counselor name: ', error);
       setCounselorName('Error Loading Name');
     }
   };
 
+  // ... (Existing Stats Fetcher) ...
   const fetchDashboardStats = async (currentCounselorId: string) => {
     try {
-      const statsDoc = await firestore()
-        .collection('counselors')
-        .doc(currentCounselorId)
-        .collection('dashboardStats')
-        .doc('summary')
-        .get();
-
+      const statsDoc = await firestore().collection('counselors').doc(currentCounselorId).collection('dashboardStats').doc('summary').get();
       if (statsDoc.exists()) {
         const data = statsDoc.data();
         setAvgWellnessScore(data?.averageWellnessScore || 0);
@@ -189,6 +152,7 @@ const CounselorDashboard = ({navigation}: Props) => {
     }
   };
 
+  // ... (Existing Alert Fetcher) ...
   const fetchRecentAlerts = async (currentCounselorId: string) => {
     try {
       const alertsSnapshot = await firestore()
@@ -202,16 +166,10 @@ const CounselorDashboard = ({navigation}: Props) => {
       const alerts: AlertItem[] = alertsSnapshot.docs.map(doc => {
         const data = doc.data();
         const score = data.score || 0;
-
         let status = 'High Risk';
         let color = '#EF4444';
-        if (score < 30) {
-          status = 'Critical';
-          color = '#B91C1C';
-        } else if (score < 40) {
-          status = 'Warning';
-          color = '#F59E0B';
-        }
+        if (score < 30) { status = 'Critical'; color = '#B91C1C'; }
+        else if (score < 40) { status = 'Warning'; color = '#F59E0B'; }
 
         return {
           id: doc.id,
@@ -223,10 +181,58 @@ const CounselorDashboard = ({navigation}: Props) => {
           timeAgo: formatTimeAgo(data.flaggedAt),
         };
       });
-
       setRecentAlerts(alerts);
     } catch (error) {
       console.error('Error fetching recent alerts:', error);
+    }
+  };
+
+  // 3. NEW FUNCTION: Fetch Today's Schedule from Firestore
+  const fetchTodaysSchedule = async (currentCounselorId: string) => {
+    try {
+      // Define Start and End of Today
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+      const snapshot = await firestore()
+        .collection('schedules')
+        .where('counselorId', '==', currentCounselorId)
+        .where('date', '>=', firestore.Timestamp.fromDate(startOfDay))
+        .where('date', '<=', firestore.Timestamp.fromDate(endOfDay))
+        .get();
+
+      const items: ScheduleItem[] = snapshot.docs.map(doc => {
+        const data = doc.data();
+        
+        // Determine color based on meeting type
+        let color = '#3B82F6'; // Blue default
+        if (data.meetingWith === 'Counselor') color = '#8B5CF6'; // Purple
+        else if (data.meetingWith === 'Doctor') color = '#10B981'; // Green
+        else if (data.meetingWith === 'Other') color = '#F59E0B'; // Orange
+
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled Session',
+          studentName: data.studentName || 'Unknown',
+          place: data.place || 'Online',
+          meetingWith: data.meetingWith,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          color: color,
+        };
+      });
+
+      // Sort by start time
+      items.sort((a, b) => {
+         const timeA = a.startTime?.toDate ? a.startTime.toDate().getTime() : 0;
+         const timeB = b.startTime?.toDate ? b.startTime.toDate().getTime() : 0;
+         return timeA - timeB;
+      });
+
+      setTodaysSchedules(items);
+    } catch (error) {
+      console.error("Error fetching today's schedule:", error);
     }
   };
 
@@ -235,13 +241,14 @@ const CounselorDashboard = ({navigation}: Props) => {
       const init = async () => {
         const currentUserId = auth().currentUser?.uid;
         if (currentUserId) {
-          // Chain these: Fetch students first, then use those docs to calculate risk
           const studentDocs = await fetchStudentCount(currentUserId);
           fetchMoodRiskStats(studentDocs);
-
           fetchCounselorName(currentUserId);
           fetchDashboardStats(currentUserId);
           fetchRecentAlerts(currentUserId);
+          
+          // Call the new fetcher
+          fetchTodaysSchedule(currentUserId);
         } else {
           setActiveStudents(0);
           setCounselorName('Guest');
@@ -249,6 +256,7 @@ const CounselorDashboard = ({navigation}: Props) => {
           setAtRiskCount(0);
           setRecentAlerts([]);
           setHighRiskMoodCount(0);
+          setTodaysSchedules([]);
         }
       };
       init();
@@ -259,36 +267,96 @@ const CounselorDashboard = ({navigation}: Props) => {
     auth().signOut();
   };
 
+  // Helper to format time (e.g., 10:30 AM)
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return '--:--';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  // Get today's date format: "WED, 25 OCT"
+  const todayDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).toUpperCase();
+
   // --- RENDER ---
   return (
     <View style={styles.fullContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f9f8fc" />
+      <StatusBar barStyle="dark-content" backgroundColor="#EEF2F6" />
+     
+     {/* --- MODERN ORGANIC BACKGROUND BLOBS --- */}
+      {/* --- VIBRANT BACKGROUND BLOBS --- */}
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <Svg height="70%" width="100%" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+          <Defs>
+            {/* Gradient 1: VIBRANT Purple */}
+            <RadialGradient id="grad1" cx="20%" cy="20%" r="80%" fx="10%" fy="10%">
+              <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.6" /> 
+              <Stop offset="60%" stopColor="#8B5CF6" stopOpacity="0.3" />
+              <Stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
+            </RadialGradient>
+            {/* Gradient 2: VIBRANT Blue */}
+            <RadialGradient id="grad2" cx="80%" cy="30%" r="80%" fx="90%" fy="20%">
+              <Stop offset="0%" stopColor="#06B6D4" stopOpacity="0.6" />
+              <Stop offset="50%" stopColor="#3B82F6" stopOpacity="0.3" />
+              <Stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+
+          {/* Blob 1 */}
+          <G transform="translate(-50, -50) rotate(20)">
+            <Ellipse cx="100" cy="100" rx="180" ry="120" fill="url(#grad1)" />
+          </G>
+
+          {/* Blob 2 */}
+          <G transform="translate(200, -80) rotate(-15)">
+             <Ellipse cx="150" cy="150" rx="150" ry="200" fill="url(#grad2)" />
+          </G>
+        </Svg>
+      </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}>
         {/* HEADER */}
-        <View style={styles.header}>
-          <Image
-            style={styles.profileCircle}
-            source={{
-              uri: `https://ui-avatars.com/api/?name=${counselorName}&background=8B5CF6&color=fff&size=150`,
-            }}
-          />
-          <View style={styles.headerText}>
-            <Text style={styles.greeting}>
-              Hello, {counselorName.split(' ')[0]}!
-            </Text>
-            <Text style={styles.subtitle}>Counselor Dashboard</Text>
+        {/* --- IMPROVED HEADER --- */}
+        <View style={styles.headerContainer}>
+          <View style={styles.headerLeft}>
+            <View style={styles.avatarContainer}>
+              <Image
+                style={styles.profileImage}
+                source={{
+                  uri: `https://ui-avatars.com/api/?name=${counselorName}&background=8B5CF6&color=fff&size=150`,
+                }}
+              />
+              {/* Online Status Dot */}
+              <View style={styles.onlineDot} />
+            </View>
+            <View style={styles.headerTexts}>
+              <Text style={styles.dateLabel}>{todayDate}</Text>
+              <Text style={styles.headerGreeting} numberOfLines={1}>
+                Hello, {counselorName.split(' ')[0]}
+              </Text>
+            </View>
           </View>
+
           <TouchableOpacity
-            style={styles.messageButton}
+            style={styles.notificationBtn}
             onPress={() => navigation.navigate('Messages')}
-            activeOpacity={0.7}>
+            activeOpacity={0.8}>
+            {/* Using your existing asset, but styled better */}
             <Image
               source={require('../Assets/message.png')}
-              style={{width: 35, height: 35}}
+              style={{width: 40, height: 40, tintColor: '#1F2937'}}
               resizeMode="contain"
             />
+            {/* Fake Notification Badge for visuals */}
+            <View style={styles.notificationBadge} />
           </TouchableOpacity>
         </View>
 
@@ -323,9 +391,10 @@ const CounselorDashboard = ({navigation}: Props) => {
             applyColorToValue={true}
             onPress={() => navigation.navigate('AvgWellnessScore')}
           />
+          {/* UPDATED SESSIONS CARD WITH LIVE DATA */}
           <StatCard
             label="Sessions"
-            value="5"
+            value={todaysSchedules.length.toString()}
             subLabel="Today"
             icon={require('../Assets/schedule.png')}
             color="#2a428c"
@@ -334,14 +403,13 @@ const CounselorDashboard = ({navigation}: Props) => {
         </View>
 
 
-        {/* 2. MOOD & EMOTIONS SECTION (COMBINED) */}
+        {/* 2. MOOD & EMOTIONS SECTION */}
         <SectionHeader title="Mood & Emotions" />
         <View style={styles.statsGrid}>
           <TouchableOpacity
-            style={styles.moodCard} // New style
+            style={styles.moodCard}
             activeOpacity={0.7}
             onPress={() => navigation.navigate('MoodAndEmotionCounselor')}>
-            {/* Header part of card */}
             <View style={styles.moodHeaderRow}>
               <View style={[styles.iconBadge, {backgroundColor: '#e3e1e915'}]}>
                 <Image
@@ -358,38 +426,19 @@ const CounselorDashboard = ({navigation}: Props) => {
                   Anxiety and Depression Evaluation
                 </Text>
               </View>
-              <Svg
-                width={20}
-                height={20}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#9CA3AF"
-                strokeWidth={2}>
-                <Path
-                  d="M9 18l6-6-6-6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={2}>
+                <Path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </View>
-
-            {/* Divider */}
             <View style={styles.moodDivider} />
-
-            {/* Stats Row */}
             <View style={styles.moodStatsContainer}>
-              {/* Left: Total */}
               <View style={styles.moodStatItem}>
                 <Text style={styles.moodValue}>
                   {activeStudents !== null ? activeStudents : '-'}
                 </Text>
                 <Text style={styles.moodLabel}>Total Monitored</Text>
               </View>
-
-              {/* Vertical Line */}
               <View style={styles.moodVerticalLine} />
-
-              {/* Right: High Risk */}
               <View style={styles.moodStatItem}>
                 <Text style={[styles.moodValue, {color: '#EF4444'}]}>
                   {highRiskMoodCount !== null ? highRiskMoodCount : '-'}
@@ -410,14 +459,7 @@ const CounselorDashboard = ({navigation}: Props) => {
               onPress={() => navigation.navigate('AddStudentScreen')}>
               <View style={[styles.box, styles.box1]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
-                  <G
-                    scale="5"
-                    x="40"
-                    y="40"
-                    stroke="#489448ff"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round">
+                  <G scale="5" x="40" y="40" stroke="#489448ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     <Path d="M6 12H18M12 6V18" />
                   </G>
                 </Svg>
@@ -428,15 +470,7 @@ const CounselorDashboard = ({navigation}: Props) => {
             <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
               <View style={[styles.box, styles.box2]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
-                  <G
-                    scale="5"
-                    x="40"
-                    y="40"
-                    fill="none"
-                    stroke="#755ca9ff"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round">
+                  <G scale="5" x="40" y="40" fill="none" stroke="#755ca9ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     <Path d="M13 3H8.2C7.0799 3 6.51984 3 6.09202 3.21799C5.71569 3.40973 5.40973 3.71569 5.21799 4.09202C5 4.51984 5 5.0799 5 6.2V17.8C5 18.9201 5 19.4802 5.21799 19.908C5.40973 20.2843 5.71569 20.5903 6.09202 20.782C6.51984 21 7.0799 21 8.2 21H15.8C16.9201 21 17.4802 21 17.908 20.782C18.2843 20.5903 18.5903 20.2843 18.782 19.908C19 19.4802 19 18.9201 19 17.8V9M13 3L19 9M13 3V7.4C13 7.96005 13 8.24008 13.109 8.45399C13.2049 8.64215 13.3578 8.79513 13.546 8.89101C13.7599 9 14.0399 9 14.6 9H19M8.12695 21C8.571 19.2748 10.1371 18 12.0009 18C13.8648 18 15.4309 19.2748 15.8749 21M13 14C13 14.5523 12.5523 15 12 15C11.4477 15 11 14.5523 11 14C11 13.4477 11.4477 13 12 13C12.5523 13 13 13.4477 13 14Z" />
                   </G>
                 </Svg>
@@ -450,15 +484,7 @@ const CounselorDashboard = ({navigation}: Props) => {
               onPress={() => navigation.navigate('SendAlerts')}>
               <View style={[styles.box, styles.box3]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
-                  <G
-                    scale="5"
-                    x="40"
-                    y="40"
-                    fill="none"
-                    stroke="#f15252ff"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round">
+                  <G scale="5" x="40" y="40" fill="none" stroke="#f15252ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     <Path d="M12 10V13" />
                     <Path d="M12 16V15.9888" />
                     <Path d="M10.2518 5.147L3.6508 17.0287C2.91021 18.3618 3.87415 20 5.39912 20H18.6011C20.126 20 21.09 18.3618 20.3494 17.0287L13.7484 5.147C12.9864 3.77538 11.0138 3.77538 10.2518 5.147Z" />
@@ -472,61 +498,16 @@ const CounselorDashboard = ({navigation}: Props) => {
               <View style={[styles.box, styles.box4]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
                   <G scale="0.234" x="40" y="40" fill="#727930ff">
-                    <Rect
-                      x="119.256"
-                      y="222.607"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="341.863"
-                      y="222.607"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="267.662"
-                      y="222.607"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="119.256"
-                      y="302.11"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="267.662"
-                      y="302.11"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="193.46"
-                      y="302.11"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="341.863"
-                      y="381.612"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="267.662"
-                      y="381.612"
-                      width="50.881"
-                      height="50.885"
-                    />
-                    <Rect
-                      x="193.46"
-                      y="381.612"
-                      width="50.881"
-                      height="50.885"
-                    />
                     <Path d="M439.277,55.046h-41.376v39.67c0,14.802-12.195,26.84-27.183,26.84h-54.025 c-14.988,0-27.182-12.038-27.182-26.84v-39.67h-67.094v39.297c0,15.008-12.329,27.213-27.484,27.213h-53.424 c-15.155,0-27.484-12.205-27.484-27.213V55.046H72.649c-26.906,0-48.796,21.692-48.796,48.354v360.246 c0,26.661,21.89,48.354,48.796,48.354h366.628c26.947,0,48.87-21.692,48.87-48.354V103.4 C488.147,76.739,466.224,55.046,439.277,55.046z M453.167,462.707c0,8.56-5.751,14.309-14.311,14.309H73.144 c-8.56,0-14.311-5.749-14.311-14.309V178.089h394.334V462.707z" />
+                    <Rect x="119.256" y="222.607" width="50.881" height="50.885"/>
+                    <Rect x="341.863" y="222.607" width="50.881" height="50.885"/>
+                    <Rect x="267.662" y="222.607" width="50.881" height="50.885"/>
+                    <Rect x="119.256" y="302.11" width="50.881" height="50.885"/>
+                    <Rect x="267.662" y="302.11" width="50.881" height="50.885"/>
+                    <Rect x="193.46" y="302.11" width="50.881" height="50.885"/>
+                    <Rect x="341.863" y="381.612" width="50.881" height="50.885"/>
+                    <Rect x="267.662" y="381.612" width="50.881" height="50.885"/>
+                    <Rect x="193.46" y="381.612" width="50.881" height="50.885"/>
                     <Path d="M141.525,102.507h53.392c4.521,0,8.199-3.653,8.199-8.144v-73.87c0-11.3-9.27-20.493-20.666-20.493h-28.459 c-11.395,0-20.668,9.192-20.668,20.493v73.87C133.324,98.854,137.002,102.507,141.525,102.507z" />
                     <Path d="M316.693,102.507h54.025c4.348,0,7.884-3.513,7.884-7.826V20.178C378.602,9.053,369.474,0,358.251,0H329.16 c-11.221,0-20.349,9.053-20.349,20.178v74.503C308.81,98.994,312.347,102.507,316.693,102.507z" />
                   </G>
@@ -537,88 +518,99 @@ const CounselorDashboard = ({navigation}: Props) => {
           </View>
         </View>
 
-        {/* 4. RECENT ALERTS (LIVE DATA) */}
+        {/* 4. RECENT ALERTS */}
+        {/* 4. RECENT ALERTS (Redesigned) */}
         <SectionHeader title="Recent Alerts" />
-        <View style={styles.cardContainer}>
+        <View style={styles.alertSectionContainer}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Attention Needed</Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('CounselorActiveAlerts')}>
+            <TouchableOpacity onPress={() => navigation.navigate('CounselorActiveAlerts')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
 
           {recentAlerts.length === 0 ? (
-            <View style={{padding: 20, alignItems: 'center'}}>
-              <Text style={{color: '#9CA3AF', fontSize: 14}}>
-                No active alerts.
-              </Text>
+            <View style={styles.emptyAlertState}>
+              <Svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth={2}>
+                <Path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+              </Svg>
+              <Text style={styles.emptyAlertText}>All Clear! No active alerts.</Text>
             </View>
           ) : (
-            recentAlerts.map((alert, index) => (
-              <View key={alert.id}>
-                <View style={styles.alertRow}>
-                  <View
-                    style={[
-                      styles.iconBadge,
-                      {backgroundColor: alert.color + '15'},
-                    ]}>
-                    <Svg
-                      width={20}
-                      height={20}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke={alert.color}
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round">
-                      <Path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                      <Path d="M12 9v4" />
-                      <Path d="M12 17h.01" />
-                    </Svg>
+            recentAlerts.map((alert) => (
+              <TouchableOpacity 
+                key={alert.id} 
+                activeOpacity={0.9}
+                style={[styles.alertCard, { shadowColor: alert.color }]}>
+                
+                {/* Colored Left Border Strip */}
+                <View style={[styles.alertAccentStrip, { backgroundColor: alert.color }]} />
+
+                <View style={styles.alertCardContent}>
+                  {/* Header: Name + Time */}
+                  <View style={styles.alertCardHeader}>
+                    <Text style={styles.alertStudentName}>{alert.studentName}</Text>
+                    <Text style={styles.alertTimeText}>{alert.timeAgo}</Text>
                   </View>
-                  <View style={styles.alertContent}>
-                    <Text style={styles.alertTitle}>
-                      {alert.studentName} has a low score ({alert.score})
-                    </Text>
-                    <Text style={styles.alertTime}>{alert.timeAgo}</Text>
-                  </View>
-                  <View
-                    style={[styles.statusPill, {backgroundColor: alert.color}]}>
-                    <Text style={styles.statusText}>{alert.status}</Text>
+
+                  {/* Body: Score Badge + Status */}
+                  <View style={styles.alertBody}>
+                    <View style={styles.scoreBadge}>
+                      <Text style={styles.scoreLabel}>Score:</Text>
+                      <Text style={[styles.scoreValue, { color: alert.color }]}>{alert.score}</Text>
+                    </View>
+                    
+                    <View style={[styles.statusBadge, { backgroundColor: alert.color + '15' }]}>
+                      <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={alert.color} strokeWidth={3}>
+                        <Path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </Svg>
+                      <Text style={[styles.statusBadgeText, { color: alert.color }]}>{alert.status}</Text>
+                    </View>
                   </View>
                 </View>
-                {index < recentAlerts.length - 1 && (
-                  <View style={styles.divider} />
-                )}
-              </View>
+
+                {/* Right Arrow */}
+                <View style={styles.arrowContainer}>
+                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={2}>
+                    <Path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
 
-        {/* 5. TODAY'S SCHEDULE */}
+        {/* 5. TODAY'S SCHEDULE - UPDATED WITH LIVE DATA */}
         <SectionHeader title="Today's Agenda" />
         <View style={styles.cardContainer}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Upcoming Sessions</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('ScheduleLog')}>
               <Text style={styles.viewAllText}>Calendar</Text>
             </TouchableOpacity>
           </View>
 
-          {todaysSchedule.map(item => (
-            <View key={item.id} style={styles.scheduleItem}>
-              <View style={styles.timeColumn}>
-                <Text style={styles.startTime}>{item.time}</Text>
-                <Text style={styles.endTime}>{item.endTime}</Text>
+          {todaysSchedules.length === 0 ? (
+             <View style={{padding: 20, alignItems: 'center'}}>
+               <Text style={{color: '#9CA3AF', fontSize: 14}}>No sessions scheduled for today.</Text>
+             </View>
+          ) : (
+            todaysSchedules.map(item => (
+              <View key={item.id} style={styles.scheduleItem}>
+                <View style={styles.timeColumn}>
+                  <Text style={styles.startTime}>{formatTime(item.startTime)}</Text>
+                  <Text style={styles.endTime}>{formatTime(item.endTime)}</Text>
+                </View>
+                <View style={[styles.scheduleCard, {borderLeftColor: item.color}]}>
+                  <Text style={styles.scheduleTitle}>{item.title}</Text>
+                  <Text style={styles.scheduleSubtitle}>
+                    {item.place} • {item.studentName}
+                  </Text>
+                </View>
               </View>
-              <View
-                style={[styles.scheduleCard, {borderLeftColor: item.color}]}>
-                <Text style={styles.scheduleTitle}>{item.title}</Text>
-                <Text style={styles.scheduleSubtitle}>{item.subtitle}</Text>
-              </View>
-            </View>
-          ))}
+            ))
+          )}
         </View>
 
         {/* SIGN OUT */}
@@ -632,29 +624,21 @@ const CounselorDashboard = ({navigation}: Props) => {
 
 // --- HELPERS ---
 
-// Helper to calculate "Time Ago"
 const formatTimeAgo = (timestamp: any) => {
   if (!timestamp) return 'Just now';
-
   const now = new Date();
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
   let interval = seconds / 31536000;
   if (interval > 1) return Math.floor(interval) + ' years ago';
-
   interval = seconds / 2592000;
   if (interval > 1) return Math.floor(interval) + ' months ago';
-
   interval = seconds / 86400;
   if (interval > 1) return Math.floor(interval) + ' days ago';
-
   interval = seconds / 3600;
   if (interval > 1) return Math.floor(interval) + ' hours ago';
-
   interval = seconds / 60;
   if (interval > 1) return Math.floor(interval) + ' mins ago';
-
   return 'Just now';
 };
 
@@ -663,6 +647,7 @@ const SectionHeader = ({title}: {title: string}) => (
     <Text style={styles.sectionHeaderText}>{title}</Text>
   </View>
 );
+
 const StatCard = ({
   label,
   value,
@@ -688,9 +673,7 @@ const StatCard = ({
       </View>
       {isWarning && <View style={styles.redDot} />}
     </View>
-    <View style={[
-          styles.statValueContainer,
-        ]}>
+    <View style={[styles.statValueContainer]}>
       <Text
         style={[
           styles.statValue,
@@ -714,60 +697,103 @@ const getWellnessLabel = (score: number | null) => {
 };
 
 const getLabelColor = (score: number | null) => {
-  if (score === null) return '#9CA3AF'; // Grey
-  if (score >= 80) return '#10B981'; // Green
-  if (score >= 60) return '#3B82F6'; // Blue
-  if (score >= 40) return '#F59E0B'; // Orange
-  return '#EF4444'; // Red
+  if (score === null) return '#9CA3AF'; 
+  if (score >= 80) return '#10B981'; 
+  if (score >= 60) return '#3B82F6'; 
+  if (score >= 40) return '#F59E0B'; 
+  return '#EF4444'; 
 };
 
 // --- STYLES ---
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: '#f9f8fc',
+    backgroundColor: '#EEF2F6',
   },
   scrollContainer: {
     padding: 20,
     paddingTop: 60,
     paddingBottom: 40,
   },
-  header: {
+  // --- NEW HEADER STYLES ---
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 16,
+    justifyContent: 'space-between',
+    marginBottom: 24, // Increased spacing for breathability
+    paddingHorizontal: 4, // Slight alignment correction
   },
-  profileCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#E5E7EB',
-  },
-  headerText: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  greeting: {
-    fontSize: 24,
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  profileImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 20, // Squircle shape (more modern than circle)
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#10B981', // Green status color
+    borderWidth: 2,
+    borderColor: '#f9f8fc', // Matches background color
+  },
+  headerTexts: {
+    justifyContent: 'center',
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  headerGreeting: {
+    fontSize: 22,
     fontWeight: '800',
     color: '#1F2937',
+    letterSpacing: -0.5,
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  messageButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
+  notificationBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    // Soft Shadow
+    shadowColor: '#6B7280',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444', // Red alert color
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   sectionHeaderContainer: {
     marginTop: 24,
@@ -857,7 +883,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   cardTitle: {
     fontSize: 14,
@@ -917,26 +943,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  alertRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  alertContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  alertTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    lineHeight: 18,
-  },
-  alertTime: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
+  
   statusPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1048,6 +1055,104 @@ const styles = StyleSheet.create({
     width: 1,
     height: 40,
     backgroundColor: '#F3F4F6',
+  },
+  // --- NEW ALERT STYLES ---
+  alertSectionContainer: {
+    marginBottom: 10,
+  },
+  alertCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    overflow: 'hidden', // Keeps the strip inside
+    // Modern Shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  alertAccentStrip: {
+    width: 6,
+    height: '100%',
+  },
+  alertCardContent: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+  },
+  alertCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  alertStudentName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  alertTimeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#9CA3AF',
+  },
+  alertBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  scoreLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginRight: 4,
+    fontWeight: '500',
+  },
+  scoreValue: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  arrowContainer: {
+    justifyContent: 'center',
+    paddingRight: 16,
+  },
+  emptyAlertState: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    borderStyle: 'dashed',
+  },
+  emptyAlertText: {
+    marginTop: 10,
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

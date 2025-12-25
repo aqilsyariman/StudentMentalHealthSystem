@@ -176,7 +176,7 @@ const ListStudent = ({navigation}: {navigation: any}) => {
 
   const handleStudentPress = (student: Student) => {
     if (navigation) {
-      navigation.navigate('HealthScoreScreen', {
+      navigation.navigate('StudentDetail', {
         studentId: student.id,
         studentName: student.name
       });
