@@ -4,6 +4,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import firestore from '@react-native-firebase/firestore';
 import {RootStackParamList} from './types/navigation';
 
+import SplashScreen from './Screens/SplashScreen';
 // Import all your screens
 import {useAuth} from './Hooks/useAuth';
 import LoginPage from './Screens/LoginPage';
@@ -29,6 +30,7 @@ import NotificationsScreen from './Screens/NotificationsScreens';
 import MoodAndEmotionCounselor from './Screens/MoodAndEmotionCounselor';
 import ScheduleScreen from './Screens/Schedule';
 import ScheduleLogScreen from './Screens/ScheduleLog';
+import report from './Screens/Report';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const App = () => {
@@ -92,7 +94,7 @@ const App = () => {
   const isInitializing = authInitializing || isRoleLoading;
 
   if (isInitializing) {
-    return null; // Or your custom Splash Screen component
+    return <SplashScreen />; // Or your custom Splash Screen component
   }
 
   return (
@@ -234,7 +236,7 @@ const App = () => {
               component={StudentDetail}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Add Student'}}
+              options={{headerShown: false, title: 'Add Student'}}
               name="AddStudentScreen"
               component={AddStudentScreen}
             />
@@ -287,7 +289,7 @@ const App = () => {
               component={AvgWellnessCounselor}
             />
             <Stack.Screen
-              options={{headerShown: true, title: 'Counselor Active Alerts'}}
+              options={{headerShown: false, title: 'Counselor Active Alerts'}}
               name="CounselorActiveAlerts"
               component={CounselorActiveAlerts}
             />
@@ -350,22 +352,39 @@ const App = () => {
               name="Schedule"
               component={ScheduleScreen}
             />
-              <Stack.Screen
-              options={{
-                headerShown: false,
-                title: 'Schedule Log',
-                headerStyle: {
-                  backgroundColor: '#DBEAFE', // Light Cyan Background
-                },
-                // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
-                headerTintColor: '#1E40AF',
-                headerTitleStyle: {
-                  fontWeight: 'bold',
-                },
-              }}
-              name="ScheduleLog"
-              component={ScheduleLogScreen}
-            />
+             
+             <Stack.Screen
+             options={{
+               headerShown: false,
+               title: 'Schedule Log',
+               headerStyle: {
+                 backgroundColor: '#DBEAFE', // Light Cyan Background
+               },
+               // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
+               headerTintColor: '#1E40AF',
+               headerTitleStyle: {
+                 fontWeight: 'bold',
+               },
+             }}
+             name="ScheduleLog"
+             component={ScheduleLogScreen}
+           />
+             <Stack.Screen
+             options={{
+               headerShown: false,
+               
+               headerStyle: {
+                 backgroundColor: '#DBEAFE', // Light Cyan Background
+               },
+               // ✅ ADD THIS: Deep Teal color for Back Arrow and Title
+               headerTintColor: '#1E40AF',
+               headerTitleStyle: {
+                 fontWeight: 'bold',
+               },
+             }}
+             name="report"
+             component={report}
+           />
           </Stack.Group>
         )}
       </Stack.Navigator>

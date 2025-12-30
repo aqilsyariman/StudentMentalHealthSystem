@@ -9,10 +9,7 @@ import {
   Image,
   StatusBar,
 } from 'react-native';
-import Svg, {Path, G, Rect,Defs,
-  RadialGradient,
-  Stop,
-  Ellipse,} from 'react-native-svg';
+import Svg, {Path, G, Rect} from 'react-native-svg';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import {useFocusEffect} from '@react-navigation/native';
@@ -288,38 +285,9 @@ const CounselorDashboard = ({navigation}: Props) => {
   // --- RENDER ---
   return (
     <View style={styles.fullContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#EEF2F6" />
+      {/* Updated StatusBar color to match new background */}
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F6FF" />
      
-     {/* --- MODERN ORGANIC BACKGROUND BLOBS --- */}
-      {/* --- VIBRANT BACKGROUND BLOBS --- */}
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-        <Svg height="70%" width="100%" viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
-          <Defs>
-            {/* Gradient 1: VIBRANT Purple */}
-            <RadialGradient id="grad1" cx="20%" cy="20%" r="80%" fx="10%" fy="10%">
-              <Stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.6" /> 
-              <Stop offset="60%" stopColor="#8B5CF6" stopOpacity="0.3" />
-              <Stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-            </RadialGradient>
-            {/* Gradient 2: VIBRANT Blue */}
-            <RadialGradient id="grad2" cx="80%" cy="30%" r="80%" fx="90%" fy="20%">
-              <Stop offset="0%" stopColor="#06B6D4" stopOpacity="0.6" />
-              <Stop offset="50%" stopColor="#3B82F6" stopOpacity="0.3" />
-              <Stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
-            </RadialGradient>
-          </Defs>
-
-          {/* Blob 1 */}
-          <G transform="translate(-50, -50) rotate(20)">
-            <Ellipse cx="100" cy="100" rx="180" ry="120" fill="url(#grad1)" />
-          </G>
-
-          {/* Blob 2 */}
-          <G transform="translate(200, -80) rotate(-15)">
-             <Ellipse cx="150" cy="150" rx="150" ry="200" fill="url(#grad2)" />
-          </G>
-        </Svg>
-      </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}>
@@ -467,7 +435,9 @@ const CounselorDashboard = ({navigation}: Props) => {
               </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.boxWrapper} activeOpacity={0.7} onPress={() => navigation.navigate('report')}>
+           
+              
               <View style={[styles.box, styles.box2]}>
                 <Svg width={35} height={35} viewBox="0 0 200 200">
                   <G scale="5" x="40" y="40" fill="none" stroke="#755ca9ff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -708,7 +678,7 @@ const getLabelColor = (score: number | null) => {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: '#EEF2F6',
+    backgroundColor: '#F0F6FF', // Changed to plain modern blue
   },
   scrollContainer: {
     padding: 20,

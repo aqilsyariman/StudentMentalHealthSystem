@@ -16,6 +16,7 @@ import {
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import Svg, {Path} from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native'; // Added for Header navigation
 
 // --- TYPES ---
 interface WellnessScore {
@@ -38,21 +39,45 @@ interface StudentWithScore {
 }
 
 // --- ICONS ---
-const AlertIcon = ({color = '#EF4444', size = 24}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-    <Path d="M12 9v4" />
-    <Path d="M12 17h.01" />
-  </Svg>
-);
-
 const ChevronRight = () => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <Path d="M9 18l6-6-6-6" />
   </Svg>
 );
 
-const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
+// --- COMPONENTS ---
+
+// Modern Header (Red Variant)
+const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) => {
+  const navigation = useNavigation();
+
+  return (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerTopRow}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.headerIconContainer}>
+          <Text style={styles.headerIcon}>🚨</Text>
+        </View>
+      </View>
+
+      <View style={styles.headerTextContainer}>
+        <Text style={styles.headerTitle}>{title}</Text>
+        <Text style={styles.headerSubtitle}>{subtitle}</Text>
+      </View>
+
+      <View style={styles.decorativeCircle} />
+    </View>
+  );
+};
+
+const CounselorActiveAlerts = () => {
+  const navigation = useNavigation<any>();
   const [atRiskStudents, setAtRiskStudents] = useState<StudentWithScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,10 +153,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
         return (a.latestScore?.finalScore || 0) - (b.latestScore?.finalScore || 0);
       });
 
-      // ============================================================
-      // 5. SAVE TO FIRESTORE (New Feature)
-      // Path: counselors -> [counselorID] -> activeAlerts -> [studentID]
-      // ============================================================
+      // 5. SAVE TO FIRESTORE
       if (tempStudentList.length > 0) {
         const batch = firestore().batch();
 
@@ -140,22 +162,21 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
             .collection('counselors')
             .doc(currentCounselorId)
             .collection('activeAlerts')
-            .doc(student.id); // Use Student ID as Document ID
+            .doc(student.id);
 
           batch.set(alertRef, {
             studentName: student.name,
             score: student.latestScore?.finalScore,
             studentId: student.id,
             email: student.email,
-            flaggedAt: firestore.FieldValue.serverTimestamp(), // When the system flagged them
-            scoreDate: student.latestScore?.date, // When the score was recorded
+            flaggedAt: firestore.FieldValue.serverTimestamp(),
+            scoreDate: student.latestScore?.date,
           }, { merge: true });
         });
 
         await batch.commit();
         console.log(`✅ Saved ${tempStudentList.length} alerts to Firestore.`);
       }
-      // ============================================================
 
       setAtRiskStudents(tempStudentList);
     } catch (error) {
@@ -202,18 +223,12 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
 
   return (
     <View style={styles.fullContainer}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="light-content" backgroundColor="#EF4444" />
 
-      {/* HEADER */}
-      <View style={styles.headerContainer}>
-        <View style={styles.titleRow}>
-          <AlertIcon size={32} />
-          <Text style={styles.headerTitle}>Active Alerts</Text>
-        </View>
-        <Text style={styles.headerSubtitle}>
-          {atRiskStudents.length} student{atRiskStudents.length !== 1 ? 's' : ''} require immediate attention.
-        </Text>
-      </View>
+      <ModernHeader 
+        title="Active Alerts" 
+        subtitle={`${atRiskStudents.length} student${atRiskStudents.length !== 1 ? 's' : ''} require immediate attention.`} 
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
@@ -246,7 +261,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
                 key={student.id}
                 style={styles.alertCard}
                 onPress={() => handleStudentPress(student)}
-                activeOpacity={0.8}>
+                activeOpacity={0.9}>
 
                 <View style={styles.urgencyStrip} />
 
@@ -305,7 +320,7 @@ const CounselorActiveAlerts = ({navigation}: {navigation: any}) => {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC', // Slate background like other modern screens
   },
   centerContainer: {
     justifyContent: 'center',
@@ -317,46 +332,94 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontWeight: '600',
   },
+  
+  // --- MODERN HEADER STYLES (Red Variant) ---
   headerContainer: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 30 : 20,
-    paddingBottom: 20,
-    backgroundColor: '#FEF2F2',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FEE2E2',
+    backgroundColor: '#EF4444', // Red-500
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    position: 'relative',
+    overflow: 'hidden',
+    zIndex: 1,
   },
-  titleRow: {
+  headerTopRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 10,
+    marginBottom: 16,
+    zIndex: 2,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginTop: -2, 
+  },
+  headerIconContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    fontSize: 20,
+  },
+  headerTextContainer: {
+    zIndex: 2,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#991B1B',
-    letterSpacing: -0.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#B91C1C',
-    marginTop: 6,
+    fontSize: 15,
+    color: '#FECACA', // Red-200
+    marginTop: 4,
     fontWeight: '500',
   },
+  decorativeCircle: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: 1,
+  },
+
+  // --- CONTENT ---
   scrollContainer: {
     padding: 20,
+    paddingTop: 10,
     paddingBottom: 40,
   },
   alertCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: 16,
     flexDirection: 'row',
     overflow: 'hidden',
     shadowColor: '#EF4444',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#FEE2E2',
   },
@@ -378,7 +441,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FEE2E2',
   },
   studentInfo: {
     flex: 1,
@@ -387,7 +450,7 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1E293B',
     marginBottom: 2,
   },
   alertTimestamp: {
@@ -418,7 +481,7 @@ const styles = StyleSheet.create({
   },
   metricsGrid: {
     flexDirection: 'row',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     padding: 12,
     justifyContent: 'space-between',
@@ -430,21 +493,22 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     fontSize: 11,
-    color: '#6B7280',
+    color: '#64748B',
     marginBottom: 4,
-    fontWeight: '500',
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   metricValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#1E293B',
   },
   criticalText: {
     color: '#EF4444',
   },
   metricDivider: {
     width: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#E2E8F0',
     height: '80%',
     alignSelf: 'center',
   },
@@ -456,8 +520,8 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#4B5563',
+    fontWeight: '700',
+    color: '#EF4444',
   },
   emptyStateContainer: {
     alignItems: 'center',
@@ -485,7 +549,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 15,
-    color: '#6B7280',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
   },

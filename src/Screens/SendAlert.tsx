@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,41 +10,57 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  
-  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import Svg, {Path} from 'react-native-svg';
-import LinearGradient from 'react-native-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
 import Animated, { 
   FadeInDown, 
   FadeInUp, 
-  useAnimatedStyle, 
   withSpring, 
   useSharedValue, 
-  withTiming,
   withSequence 
 } from 'react-native-reanimated';
 
+// --- COMPONENTS ---
 
-// --- ICONS ---
-const BackIcon = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#1F2937" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M15 18l-6-6 6-6" />
-  </Svg>
-);
+// 1. Modern Header (Same as Schedule Screen)
+const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) => {
+  const navigation = useNavigation();
 
-const SendIcon = () => (
-  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-  </Svg>
-);
+  return (
+    <View style={styles.headerContainer}>
+      {/* Top Row: Back Button & Icon */}
+      <View style={styles.headerTopRow}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.headerIconContainer}>
+          <Text style={styles.headerIcon}>🔔</Text>
+        </View>
+      </View>
 
-// --- ANIMATED COMPONENTS ---
+      {/* Title Section */}
+      <View style={styles.headerTextContainer}>
+        <Text style={styles.headerTitle}>{title}</Text>
+        <Text style={styles.headerSubtitle}>{subtitle}</Text>
+      </View>
+
+      {/* Decorative Circle */}
+      <View style={styles.decorativeCircle} />
+    </View>
+  );
+};
+
+// 2. Animated Touchable for interactive elements
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-const SendAlertScreen = ({navigation}: {navigation: any}) => {
+const SendAlertScreen = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -56,6 +72,7 @@ const SendAlertScreen = ({navigation}: {navigation: any}) => {
 
   // Animation Values
   const buttonScale = useSharedValue(1);
+  const navigation = useNavigation();
 
   // --- FETCH STUDENTS ---
   useEffect(() => {
@@ -98,7 +115,7 @@ const SendAlertScreen = ({navigation}: {navigation: any}) => {
 
     setSending(true);
     // Button Bounce Animation
-    buttonScale.value = withSequence(withSpring(0.9), withSpring(1));
+    buttonScale.value = withSequence(withSpring(0.95), withSpring(1));
     
     const counselorId = auth().currentUser?.uid;
 
@@ -131,245 +148,250 @@ const SendAlertScreen = ({navigation}: {navigation: any}) => {
     return 'Message from Counselor';
   };
 
-  // --- RENDER HELPERS ---
-  const getSeverityColor = (type: string) => {
-    switch (type) {
-      case 'critical': return ['#FF416C', '#FF4B2B']; // Red Gradient
-      case 'warning': return ['#F7971E', '#FFD200']; // Orange Gradient
-      default: return ['#56CCF2', '#2F80ED']; // Blue Gradient
+  const getSeverityStyle = (level: string) => {
+    switch (level) {
+      case 'critical': return { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' };
+      case 'warning': return { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' };
+      default: return { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' }; // Info
     }
   };
 
-  const SeverityCard = ({level, label}: {level: 'info' | 'warning' | 'critical', label: string}) => {
-    const isSelected = severity === level;
-    
-    const animatedStyle = useAnimatedStyle(() => {
-      return {
-        transform: [{ scale: withTiming(isSelected ? 1.05 : 1) }],
-        opacity: withTiming(isSelected ? 1 : 0.6),
-      };
-    });
-
-    const colors = getSeverityColor(level);
-
-    return (
-      <AnimatedTouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => setSeverity(level)}
-        style={[styles.severityCard, animatedStyle]}
-      >
-        <LinearGradient
-          colors={isSelected ? colors : ['#FFFFFF', '#F9FAFB']}
-          style={styles.severityGradient}
-          start={{x: 0, y: 0}} end={{x: 1, y: 1}}
-        >
-          <Text style={[
-            styles.severityText, 
-            { color: isSelected ? '#FFF' : '#6B7280' }
-          ]}>
-            {label}
-          </Text>
-          {isSelected && <View style={styles.activeDot} />}
-        </LinearGradient>
-      </AnimatedTouchableOpacity>
-    );
-  };
-
   return (
-    <LinearGradient 
-      colors={['#F0F3FF', '#FFFFFF']} 
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      start={{x: 0, y: 0}} end={{x: 1, y: 1}}
     >
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardContainer}>
+      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
+      
+      <ModernHeader title="New Alert" subtitle="Notify a student instantly" />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        {/* 1. SEVERITY SELECTOR */}
+        <Animated.View style={styles.formCard} entering={FadeInDown.delay(100).duration(600)}>
+          <Text style={styles.sectionLabel}>Priority Level</Text>
+          <View style={styles.severityContainer}>
+            {['info', 'warning', 'critical'].map((level) => {
+              const isSelected = severity === level;
+              const style = getSeverityStyle(level);
+              return (
+                 <TouchableOpacity
+                    key={level}
+                    activeOpacity={0.7}
+                    onPress={() => setSeverity(level as any)}
+                    style={[
+                      styles.severityCard,
+                      { 
+                        backgroundColor: isSelected ? style.bg : '#F8FAFC',
+                        borderColor: isSelected ? style.border : '#F1F5F9',
+                      }
+                    ]}
+                 >
+                    
+                    <Text style={[
+                      styles.severityText,
+                      { color: isSelected ? style.text : '#64748B' }
+                    ]}>
+                      {level.charAt(0).toUpperCase() + level.slice(1)}
+                    </Text>
+                 </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        {/* 2. RECIPIENT SELECTOR */}
+        <Animated.View style={[styles.formCard, { marginTop: 20 }]} entering={FadeInDown.delay(200).duration(600)}>
+          <Text style={styles.sectionLabel}>Select Student</Text>
+          {loading ? (
+            <ActivityIndicator color="#4F46E5" />
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentScroll}>
+              {students.map((student, index) => {
+                const isSelected = selectedStudentId === student.id;
+                return (
+                  <AnimatedTouchableOpacity
+                    key={student.id}
+                    activeOpacity={0.8}
+                    entering={FadeInDown.delay(index * 50 + 300)}
+                    onPress={() => setSelectedStudentId(student.id)}
+                    style={[
+                      styles.studentCard,
+                      isSelected && styles.studentCardSelected
+                    ]}
+                  >
+                    <View style={[
+                      styles.avatar,
+                      isSelected ? { backgroundColor: '#4F46E5' } : { backgroundColor: '#EEF2FF' }
+                    ]}>
+                      <Text style={[
+                        styles.avatarText,
+                        isSelected ? { color: '#FFF' } : { color: '#4F46E5' }
+                      ]}>{student.initials}</Text>
+                    </View>
+                    <Text numberOfLines={1} style={[styles.studentName, isSelected && styles.studentNameSelected]}>
+                      {student.name.split(' ')[0]}
+                    </Text>
+                  </AnimatedTouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+        </Animated.View>
+
+        {/* 3. MESSAGE INPUT */}
+        <Animated.View style={[styles.formCard, { marginTop: 20 }]} entering={FadeInDown.delay(300).duration(600)}>
+          <Text style={styles.sectionLabel}>Message</Text>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type your message here..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              value={message}
+              onChangeText={setMessage}
+            />
+          </View>
           
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            
-            {/* HEADER WITH BACK BUTTON */}
-            <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.headerRow}>
+          {/* Quick Tags */}
+          <View style={styles.quickTagsContainer}>
+            {['Please reply', 'Meeting required', 'Wellness Check', 'Urgent'].map(tag => (
               <TouchableOpacity 
-                style={styles.backButton} 
-                onPress={() => navigation.goBack()}
+                key={tag} 
+                onPress={() => setMessage(prev => prev + (prev ? ' ' : '') + tag)}
+                style={styles.tag}
               >
-                <BackIcon />
+                <Text style={styles.tagText}>+ {tag}</Text>
               </TouchableOpacity>
-              
-              <View>
-                <Text style={styles.headerTitle}>New Alert</Text>
-                <Text style={styles.headerSubtitle}>Notify a student instantly.</Text>
-              </View>
-            </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
 
-            {/* 1. SEVERITY SELECTOR */}
-            <Animated.View style={styles.section} entering={FadeInDown.delay(200).duration(600)}>
-              <Text style={styles.sectionLabel}>Priority Level</Text>
-              <View style={styles.severityContainer}>
-                <SeverityCard level="info" label="Info" />
-                <SeverityCard level="warning" label="Warning" />
-                <SeverityCard level="critical" label="Critical" />
-              </View>
-            </Animated.View>
+        {/* FOOTER BUTTON */}
+        <Animated.View entering={FadeInUp.delay(400)} style={{ marginBottom: 40 }}>
+          <TouchableOpacity 
+            style={[
+              styles.submitButton, 
+              (sending || !selectedStudentId) && styles.disabledButton,
+              { backgroundColor: severity === 'critical' ? '#EF4444' : severity === 'warning' ? '#F59E0B' : '#4F46E5' }
+            ]}
+            onPress={handleSend}
+            disabled={sending}
+            activeOpacity={0.8}
+          >
+            {sending ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Send Alert</Text>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
 
-            {/* 2. RECIPIENT SELECTOR */}
-            <Animated.View style={styles.section} entering={FadeInDown.delay(300).duration(600)}>
-              <Text style={styles.sectionLabel}>Select Student</Text>
-              {loading ? (
-                <ActivityIndicator color="#4F46E5" />
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentScroll}>
-                  {students.map((student, index) => {
-                    const isSelected = selectedStudentId === student.id;
-                    return (
-                      <AnimatedTouchableOpacity
-                        key={student.id}
-                        entering={FadeInDown.delay(index * 50 + 300)}
-                        onPress={() => setSelectedStudentId(student.id)}
-                        style={[
-                          styles.studentCard,
-                          isSelected && styles.studentCardSelected
-                        ]}
-                      >
-                        <LinearGradient
-                          colors={isSelected ? ['#6366F1', '#4F46E5'] : ['#FFFFFF', '#F3F4F6']}
-                          style={styles.avatar}
-                        >
-                          <Text style={[styles.avatarText, isSelected && {color: '#FFF'}]}>{student.initials}</Text>
-                        </LinearGradient>
-                        <Text numberOfLines={1} style={[styles.studentName, isSelected && styles.studentNameSelected]}>
-                          {student.name.split(' ')[0]}
-                        </Text>
-                      </AnimatedTouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </Animated.View>
-
-            {/* 3. MESSAGE INPUT */}
-            <Animated.View style={styles.section} entering={FadeInDown.delay(400).duration(600)}>
-              <Text style={styles.sectionLabel}>Message</Text>
-              <View style={[styles.inputContainer, styles.shadow]}>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Type your message..."
-                  placeholderTextColor="#9CA3AF"
-                  multiline
-                  value={message}
-                  onChangeText={setMessage}
-                />
-                {/* Quick Tags */}
-                <View style={styles.quickTagsContainer}>
-                  {['Book Session', 'Update Log', 'Urgent'].map(tag => (
-                    <TouchableOpacity 
-                      key={tag} 
-                      onPress={() => setMessage(prev => prev + (prev ? ' ' : '') + tag)}
-                      style={styles.tag}
-                    >
-                      <Text style={styles.tagText}>+ {tag}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </Animated.View>
-
-          </ScrollView>
-
-          {/* FOOTER BUTTON */}
-          <Animated.View entering={FadeInUp.delay(600)} style={styles.footer}>
-            <TouchableOpacity 
-              activeOpacity={0.9}
-              onPress={handleSend}
-              disabled={sending}
-            >
-              <LinearGradient
-                colors={!selectedStudentId ? ['#D1D5DB', '#9CA3AF'] : getSeverityColor(severity)}
-                start={{x: 0, y: 0}} end={{x: 1, y: 0}}
-                style={styles.sendButton}
-              >
-                {sending ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <>
-                    <Text style={styles.sendButtonText}>Send {severity.toUpperCase()} Alert</Text>
-                    <SendIcon />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </LinearGradient>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  keyboardContainer: {
-    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    padding: 24,
-    paddingBottom: 100,
+    padding: 20,
+    paddingTop: 10,
   },
-  // HEADER
-  headerRow: {
+
+  // --- Header Styles (Copied from Theme) ---
+  headerContainer: {
+    backgroundColor: '#4F46E5',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    position: 'relative',
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  headerTopRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 10,
+    marginBottom: 16,
+    zIndex: 2,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF',
-    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
-    marginRight: 16,
-    // Soft shadow for button
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginTop: -2, 
+  },
+  headerIconContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    fontSize: 20,
+  },
+  headerTextContainer: {
+    zIndex: 2,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: -0.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 15,
+    color: '#E0E7FF',
+    marginTop: 4,
+    fontWeight: '500',
   },
-  
-  // SECTIONS
-  section: {
-    marginBottom: 24,
+  decorativeCircle: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: 1,
+  },
+
+  // --- Form Cards ---
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 4,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    marginBottom: 12,
-    letterSpacing: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 16,
     textTransform: 'uppercase',
   },
 
-  // SEVERITY CARDS
+  // --- Severity Chips ---
   severityContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -377,45 +399,25 @@ const styles = StyleSheet.create({
   },
   severityCard: {
     flex: 1,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: '#FFF',
-    // Subtle shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  severityGradient: {
-    flex: 1,
-    borderRadius: 14,
-    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 2,
     alignItems: 'center',
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#F9FAFB',
+    justifyContent: 'center',
   },
   severityText: {
     fontWeight: '700',
     fontSize: 13,
   },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFF',
-    marginLeft: 6,
-  },
 
-  // STUDENTS
+  // --- Student List ---
   studentScroll: {
-    marginHorizontal: -24,
-    paddingHorizontal: 24,
+    marginHorizontal: -10, // pull back to align with padding
   },
   studentCard: {
     alignItems: 'center',
     marginRight: 16,
+    padding: 4,
     width: 70,
   },
   studentCardSelected: {
@@ -428,42 +430,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#FFF',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
   avatarText: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#6B7280',
+    fontWeight: '700',
   },
   studentName: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#64748B',
     fontWeight: '500',
+    textAlign: 'center',
   },
   studentNameSelected: {
     color: '#4F46E5',
     fontWeight: '700',
   },
 
-  // INPUT
-  inputContainer: {
-    backgroundColor: '#FFF',
-    borderRadius: 20,
+  // --- Input ---
+  inputWrapper: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
     padding: 16,
-    minHeight: 160,
-    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#F9FAFB',
+    borderColor: '#E2E8F0',
+    minHeight: 120,
   },
   textInput: {
     fontSize: 16,
-    color: '#1F2937',
+    color: '#1E293B',
     textAlignVertical: 'top',
     flex: 1,
   },
@@ -471,52 +465,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    marginTop: 16,
   },
   tag: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
   },
   tagText: {
-    color: '#6B7280',
-    fontSize: 11,
+    color: '#64748B',
+    fontSize: 12,
     fontWeight: '600',
   },
-  shadow: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.03,
-    shadowRadius: 16,
-    elevation: 4,
-  },
 
-  // FOOTER
-  footer: {
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 24,
-  },
-  sendButton: {
-    height: 56,
-    borderRadius: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
+  // --- Button ---
+  submitButton: {
+    backgroundColor: '#4F46E5',
+    borderRadius: 20,
+    paddingVertical: 20,
     alignItems: 'center',
-    gap: 10,
-    shadowColor: "#4F46E5",
+    marginTop: 24,
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 16,
-    elevation: 6,
+    elevation: 10,
   },
-  sendButtonText: {
-    color: '#FFF',
-    fontSize: 16,
+  disabledButton: {
+    backgroundColor: '#94A3B8',
+    shadowOpacity: 0,
+  },
+  submitButtonText: {
+    fontSize: 18,
     fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
 

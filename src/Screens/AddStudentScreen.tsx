@@ -10,13 +10,15 @@ import {
   Alert,
   TouchableOpacity,
   StatusBar,
-  SafeAreaView,
   RefreshControl,
-  Image, // Added Image import
+  Image,
+  Platform,
+
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import Svg, { Path, Circle } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
 
 // --- TYPES ---
 type Student = {
@@ -25,11 +27,11 @@ type Student = {
   email: string;
   counselorId: string | null;
   counselorName?: string;
-  avatar: string; // NEW: Added avatar field
+  avatar: string; // Preserved avatar field
 };
 
 // --- ICONS ---
-const SearchIcon = ({ color = '#9CA3AF' }) => (
+const SearchIcon = ({ color = '#64748B' }) => (
   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
     <Circle cx={11} cy={11} r={8} />
     <Path d="M21 21l-4.35-4.35" />
@@ -49,6 +51,37 @@ const CheckIcon = ({ color = '#10B981' }) => (
     <Path d="M20 6L9 17l-5-5" />
   </Svg>
 );
+
+// --- COMPONENTS ---
+
+// Modern Header (Consistent with Schedule/Report)
+const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) => {
+  const navigation = useNavigation();
+
+  return (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerTopRow}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.headerIconContainer}>
+          <Text style={styles.headerIcon}>👥</Text>
+        </View>
+      </View>
+
+      <View style={styles.headerTextContainer}>
+        <Text style={styles.headerTitle}>{title}</Text>
+        <Text style={styles.headerSubtitle}>{subtitle}</Text>
+      </View>
+
+      <View style={styles.decorativeCircle} />
+    </View>
+  );
+};
 
 const AddStudentScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -91,7 +124,7 @@ const AddStudentScreen = () => {
           counselorName = await getCounselorName(counselorId);
         }
 
-        // NEW: Avatar Logic (Photo URL or Fallback based on Email)
+        // PRESERVED: Avatar Logic
         const avatar = data.photoURL || `https://i.pravatar.cc/150?u=${data.email}`;
 
         studentList.push({
@@ -105,7 +138,6 @@ const AddStudentScreen = () => {
       }
 
       setAllStudents(studentList);
-      // We removed organizeSections here to rely on the useEffect below
     } catch (error) {
       console.error('Error fetching students:', error);
       Alert.alert('Error', 'Could not load student list.');
@@ -140,7 +172,6 @@ const AddStudentScreen = () => {
     fetchStudents();
   }, [fetchStudents]);
 
-  // --- UPDATE LIST ON SEARCH ---
   useEffect(() => {
     organizeSections(allStudents, searchQuery);
   }, [searchQuery, allStudents]);
@@ -182,7 +213,7 @@ const AddStudentScreen = () => {
     return (
       <View style={styles.card}>
         <View style={styles.cardContent}>
-          {/* UPDATED: Uses Image instead of Text/View */}
+          {/* PRESERVED: Avatar Image */}
           <Image 
             source={{ uri: item.avatar }} 
             style={styles.avatarImage} 
@@ -194,7 +225,7 @@ const AddStudentScreen = () => {
             {isAssigned && (
               <View style={[styles.statusBadge, isAssignedToMe ? styles.badgeMine : styles.badgeOthers]}>
                 <Text style={[styles.statusText, isAssignedToMe ? styles.textMine : styles.textOthers]}>
-                  {isAssignedToMe ? 'Assigned to You' : `Under ${item.counselorName}`}
+                  {isAssignedToMe ? 'Assigned to You' : `With ${item.counselorName}`}
                 </Text>
               </View>
             )}
@@ -219,148 +250,218 @@ const AddStudentScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
 
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerSubtitle}>Add new students to your class</Text>
-      </View>
+      <ModernHeader title="Manage Class" subtitle="Add new students to your list" />
 
-      <View style={styles.searchWrapper}>
-        <View style={styles.searchContainer}>
-          <SearchIcon />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by name..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
+      <View style={styles.contentContainer}>
+        {/* Search Bar - Floating Style */}
+        <View style={styles.searchWrapper}>
+          <View style={styles.searchContainer}>
+            <SearchIcon />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by name..."
+              placeholderTextColor="#94A3B8"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+            />
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4F46E5" />
+            <Text style={styles.loadingText}>Loading students...</Text>
+          </View>
+        ) : (
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={renderStudent}
+            renderSectionHeader={({ section: { title } }) => (
+              <Text style={styles.sectionHeader}>{title}</Text>
+            )}
+            contentContainerStyle={styles.listContent}
+            stickySectionHeadersEnabled={false}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4F46E5']} />
+            }
+            ListEmptyComponent={() => (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyTitle}>No students found</Text>
+                <Text style={styles.emptyText}>Try adjusting your search terms</Text>
+              </View>
+            )}
           />
-        </View>
+        )}
       </View>
-
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading students...</Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderStudent}
-          renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.sectionHeader}>{title}</Text>
-          )}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6366F1']} />
-          }
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyTitle}>No students found</Text>
-              <Text style={styles.emptyText}>Try adjusting your search terms</Text>
-            </View>
-          )}
-        />
-      )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
   },
+  contentContainer: {
+    flex: 1,
+    marginTop: 10, // Pull content up to overlap/connect with header slightly
+  },
+  
+  // --- HEADER STYLES ---
   headerContainer: {
+    backgroundColor: '#4F46E5',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 40, // Increased bottom padding for search bar overlap area
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    position: 'relative',
+    overflow: 'hidden',
+    zIndex: 1,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    zIndex: 2,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginTop: -2, 
+  },
+  headerIconContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerIcon: {
+    fontSize: 20,
+  },
+  headerTextContainer: {
+    zIndex: 2,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#111827',
-    letterSpacing: -0.5,
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: '#E0E7FF',
+    marginTop: 4,
+    fontWeight: '500',
   },
+  decorativeCircle: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: 1,
+  },
+
+  // --- SEARCH BAR ---
   searchWrapper: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingHorizontal: 20,
     zIndex: 10,
+    marginBottom: 10,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     paddingHorizontal: 16,
-    height: 50,
+    height: 56,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   searchInput: {
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
-    color: '#1F2937',
+    color: '#1E293B',
     height: '100%',
+    fontWeight: '500',
   },
+
+  // --- LIST CONTENT ---
   listContent: {
-    padding: 24,
-    paddingTop: 0,
+    padding: 20,
+    paddingTop: 10,
   },
   sectionHeader: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#374151',
-    marginTop: 24,
+    color: '#64748B',
+    marginTop: 16,
     marginBottom: 12,
-    letterSpacing: -0.5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 40,
   },
   loadingText: {
     marginTop: 12,
-    color: '#6B7280',
+    color: '#64748B',
     fontSize: 14,
   },
+
   // --- CARD STYLES ---
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: '#64748B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#F1F5F9',
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  // NEW: Avatar Image Style
   avatarImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#E5E7EB', // Fallback gray while loading
+    backgroundColor: '#EEF2FF',
     marginRight: 16,
   },
   infoContainer: {
@@ -369,46 +470,48 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: '#1E293B',
   },
   studentEmail: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#64748B',
     marginTop: 2,
   },
+
   // --- STATUS BADGES ---
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
     marginTop: 6,
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   badgeMine: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#DCFCE7',
   },
   badgeOthers: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FEE2E2',
   },
   textMine: {
-    color: '#059669',
+    color: '#166534',
   },
   textOthers: {
-    color: '#DC2626',
+    color: '#991B1B',
   },
+
   // --- BUTTONS ---
   addButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#4F46E5', // Updated Theme Color
     width: 44,
     height: 44,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#6366F1',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -419,6 +522,8 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -426,13 +531,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: '700',
+    color: '#64748B',
     marginTop: 16,
   },
   emptyText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: '#94A3B8',
     marginTop: 4,
   },
 });

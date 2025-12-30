@@ -18,7 +18,7 @@ export type RootStackParamList = {
     otherPersonId: string;
   };
   NewConversation: undefined; // Only for counselors
-    CounselorStudentList: undefined;
+    CounselorStudentNewChat: undefined;
   HealthScoreScreen: undefined;
   AvgWellnessScore: undefined;
   CounselorActiveAlerts: undefined;
@@ -27,4 +27,6 @@ export type RootStackParamList = {
   MoodAndEmotionCounselor: undefined;
   Schedule: undefined;
 ScheduleLog: undefined;
+report: undefined;
+
 };

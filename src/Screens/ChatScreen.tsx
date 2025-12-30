@@ -11,12 +11,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  ActivityIndicator,
 } from 'react-native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {RootStackParamList} from '../types/navigation';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import Svg, {Path, G, Circle} from 'react-native-svg';
+import Svg, {Path} from 'react-native-svg';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ChatScreen'>;
 
@@ -32,7 +33,7 @@ const ChatScreen = ({navigation, route}: Props) => {
   const {conversationId, otherPersonName, otherPersonId} = route.params;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [_loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [otherPersonAvatar, setOtherPersonAvatar] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const currentUserId = auth().currentUser?.uid;
@@ -46,6 +47,8 @@ const ChatScreen = ({navigation, route}: Props) => {
           .doc(otherPersonId)
           .get();
 
+        const fallbackAvatar = `https://i.pravatar.cc/150?u=${otherPersonId}`;
+
         if (!userDoc.exists) {
           const counselorDoc = await firestore()
             .collection('counselors')
@@ -53,16 +56,12 @@ const ChatScreen = ({navigation, route}: Props) => {
             .get();
 
           if (counselorDoc.exists()) {
-            setOtherPersonAvatar(
-              counselorDoc.data()?.photoURL ||
-              `https://i.pravatar.cc/150?u=${otherPersonId}`
-            );
+            setOtherPersonAvatar(counselorDoc.data()?.photoURL || fallbackAvatar);
+          } else {
+            setOtherPersonAvatar(fallbackAvatar);
           }
         } else {
-          setOtherPersonAvatar(
-            userDoc.data()?.photoURL ||
-            `https://i.pravatar.cc/150?u=${otherPersonId}`
-          );
+          setOtherPersonAvatar(userDoc.data()?.photoURL || fallbackAvatar);
         }
       } catch (error) {
         console.error('Error fetching avatar:', error);
@@ -230,6 +229,11 @@ const ChatScreen = ({navigation, route}: Props) => {
 
     return (
       <View>
+        {showDate && (
+          <View style={styles.dateHeaderContainer}>
+             <Text style={styles.dateHeader}>{formatDateHeader(item.timestamp)}</Text>
+          </View>
+        )}
         <View
           style={[
             styles.messageBubble,
@@ -242,12 +246,12 @@ const ChatScreen = ({navigation, route}: Props) => {
             ]}>
             {item.text}
           </Text>
+          {item.timestamp && (
+            <Text style={[styles.timeText, isMyMessage ? {color: 'rgba(255,255,255,0.7)'} : {color: '#94A3B8'}]}>
+              {item.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </Text>
+          )}
         </View>
-        {showDate && (
-          <Text style={styles.dateHeader}>
-            {formatDateHeader(item.timestamp)}
-          </Text>
-        )}
       </View>
     );
   };
@@ -257,84 +261,65 @@ const ChatScreen = ({navigation, route}: Props) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}>
-          <Svg width={28} height={28} viewBox="0 0 24 24">
-            <Path
-              d="M15 18L9 12L15 6"
-              stroke="#000000"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </Svg>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.headerCenter}
-          activeOpacity={0.7}
-          onPress={() => {
-            // Navigate to profile or do nothing
-          }}>
-          <Image
-            source={{uri: otherPersonAvatar || `https://i.pravatar.cc/150?u=${otherPersonId}`}}
-            style={styles.headerAvatar}
-          />
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerName}>{otherPersonName}</Text>
-            <Text style={styles.headerStatus}>Active now</Text>
+      {/* --- NEW HEADER UI (Logic Unchanged) --- */}
+      <View style={styles.headerContainer}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+          
+          {/* Avatar Display in Header */}
+          <View style={styles.headerAvatarContainer}>
+             <Image source={{ uri: otherPersonAvatar || `https://i.pravatar.cc/150?u=${otherPersonId}` }} style={styles.headerAvatarImage} />
           </View>
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity style={styles.infoButton} activeOpacity={0.7}>
-          <Svg width={24} height={24} viewBox="0 0 24 24">
-            <Circle cx="12" cy="12" r="1.5" fill="#000000" />
-            <Circle cx="12" cy="6" r="1.5" fill="#000000" />
-            <Circle cx="12" cy="18" r="1.5" fill="#000000" />
-          </Svg>
-        </TouchableOpacity>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>{otherPersonName}</Text>
+          <Text style={styles.headerSubtitle}>Active Now</Text>
+        </View>
+
+        <View style={styles.decorativeCircle} />
       </View>
+      {/* --------------------------------------- */}
 
       {/* Messages List */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        inverted
-        contentContainerStyle={styles.messagesContainer}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => flatListRef.current?.scrollToOffset({offset: 0, animated: true})}
-      />
+      <View style={styles.contentContainer}>
+        {loading ? (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4F46E5" />
+            </View>
+        ) : (
+            <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderMessage}
+                keyExtractor={item => item.id}
+                inverted
+                contentContainerStyle={styles.messagesListContent}
+                showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => flatListRef.current?.scrollToOffset({offset: 0, animated: true})}
+            />
+        )}
+      </View>
 
       {/* Input Area */}
       <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.cameraButton} activeOpacity={0.7}>
-          <Svg width={24} height={24} viewBox="0 0 24 24">
-            <G
-              fill="none"
-              stroke="#262626"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round">
-              <Path d="M23 19C23 20.1046 22.1046 21 21 21H3C1.89543 21 1 20.1046 1 19V8C1 6.89543 1.89543 6 3 6H7L9 3H15L17 6H21C22.1046 6 23 6.89543 23 8V19Z" />
-              <Circle cx="12" cy="13" r="4" />
-            </G>
-          </Svg>
+        <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
+          <Text style={styles.actionButtonText}>+</Text>
         </TouchableOpacity>
 
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}
-            placeholder="Message..."
-            placeholderTextColor="#8E8E8E"
+            placeholder="Type a message..."
+            placeholderTextColor="#94A3B8"
             value={inputText}
             onChangeText={setInputText}
             multiline
@@ -342,61 +327,25 @@ const ChatScreen = ({navigation, route}: Props) => {
           />
         </View>
 
-        {inputText.trim() ? (
+        {inputText.trim().length > 0 ? (
           <TouchableOpacity
             style={styles.sendButton}
             onPress={sendMessage}
             activeOpacity={0.7}>
-            <Text style={styles.sendButtonText}>Send</Text>
+            <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+               <Path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="#4F46E5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+            </Svg>
           </TouchableOpacity>
         ) : (
-          <>
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-              <Svg width={24} height={24} viewBox="0 0 24 24">
-                <Path
-                  d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-                  stroke="#262626"
-                  strokeWidth={2}
-                  fill="none"
-                />
-                <Path
-                  d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14M15 9H15.01M9 9H9.01"
-                  stroke="#262626"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </Svg>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-              <Svg width={24} height={24} viewBox="0 0 24 24">
-                <Circle cx="12" cy="12" r="10" stroke="#262626" strokeWidth={2} fill="none" />
-                <Path
-                  d="M12 6V12L16 14"
-                  stroke="#262626"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </Svg>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
-              <Svg width={24} height={24} viewBox="0 0 24 24">
-                <Path
-                  d="M19 11H5M19 11C20.1046 11 21 11.8954 21 13V19C21 20.1046 20.1046 21 19 21H5C3.89543 21 3 20.1046 3 19V13C3 11.8954 3.89543 11 5 11M19 11V9C19 7.89543 18.1046 7 17 7M5 11V9C5 7.89543 5.89543 7 7 7M7 7V5C7 3.89543 7.89543 3 9 3H15C16.1046 3 17 3.89543 17 5V7M7 7H17"
-                  stroke="#262626"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </Svg>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity style={styles.iconButton} activeOpacity={0.7}>
+             {/* Mic Icon */}
+             <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth={2}>
+                <Path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <Path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <Path d="M12 19v4" />
+                <Path d="M8 23h8" />
+             </Svg>
+          </TouchableOpacity>
         )}
       </View>
     </KeyboardAvoidingView>
@@ -406,127 +355,206 @@ const ChatScreen = ({navigation, route}: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
-  header: {
+  
+  // --- HEADER STYLES ---
+  headerContainer: {
+    backgroundColor: '#4F46E5',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    position: 'relative',
+    overflow: 'hidden',
+    marginBottom: 10,
+    zIndex: 2,
+  },
+  headerTopRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#DBDBDB',
+    marginBottom: 16,
+    zIndex: 2,
   },
   backButton: {
-    padding: 8,
-    marginRight: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerCenter: {
+  backIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginTop: -2, 
+  },
+  headerAvatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  headerTextContainer: {
+    zIndex: 2,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: 15,
+    color: '#E0E7FF',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  decorativeCircle: {
+    position: 'absolute',
+    top: -50,
+    right: -50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: 1,
+  },
+
+  // --- MESSAGES ---
+  contentContainer: {
     flex: 1,
-    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  headerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EFEFEF',
-    marginRight: 12,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  headerStatus: {
-    fontSize: 12,
-    color: '#8E8E8E',
-    marginTop: 2,
-  },
-  infoButton: {
-    padding: 8,
-  },
-  messagesContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  messagesListContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   messageBubble: {
-    maxWidth: '75%',
+    maxWidth: '80%',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 22,
-    marginVertical: 2,
+    paddingVertical: 12,
+    borderRadius: 20,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   myMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#4e6fdbff',
-    marginLeft: 'auto',
+    backgroundColor: '#4F46E5', // Indigo Theme
+    borderBottomRightRadius: 4,
   },
   theirMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#EFEFEF',
-    marginRight: 'auto',
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   messageText: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 22,
   },
   myMessageText: {
     color: '#FFFFFF',
   },
   theirMessageText: {
-    color: '#000000',
+    color: '#1E293B',
+  },
+  timeText: {
+    fontSize: 10,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  dateHeaderContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
   },
   dateHeader: {
-    textAlign: 'center',
     fontSize: 12,
-    color: '#8E8E8E',
-    marginVertical: 16,
-    fontWeight: '500',
+    color: '#94A3B8',
+    fontWeight: '600',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
+
+  // --- INPUT AREA ---
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 0.5,
-    borderTopColor: '#DBDBDB',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
   },
-  cameraButton: {
-    padding: 8,
-    marginRight: 8,
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  actionButtonText: {
+    fontSize: 20,
+    color: '#4F46E5',
+    fontWeight: '600',
+    marginTop: -2,
   },
   inputWrapper: {
     flex: 1,
-    backgroundColor: '#EFEFEF',
-    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    maxHeight: 100,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginRight: 10,
   },
   input: {
-    fontSize: 14,
-    color: '#000000',
-    maxHeight: 80,
+    fontSize: 15,
+    color: '#1E293B',
+    maxHeight: 100,
   },
   sendButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginLeft: 8,
-  },
-  sendButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0095F6',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
   },
   iconButton: {
-    padding: 8,
-    marginLeft: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 
