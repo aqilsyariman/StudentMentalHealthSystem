@@ -20,26 +20,16 @@ import Svg, {Path, Defs, LinearGradient, Stop} from 'react-native-svg';
 
 const {width} = Dimensions.get('window');
 
-// --- ICONS ---
-const HeartIcon = ({size = 32, color = '#FF6F61'}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-  </Svg>
-);
-
-const StepIcon = ({size = 32, color = '#6f5be1'}) => (
-  <Svg width={size} height={size} viewBox="0 0 640 512" fill={color}>
-    <Path d="M192 160h32V32h-32c-35.35 0-64 28.65-64 64s28.65 64 64 64zM0 416c0 35.35 28.65 64 64 64h32V352H64c-35.35 0-64 28.65-64 64zm337.46-128c-34.91 0-76.16 13.12-104.73 32-24.79 16.38-44.52 32-104.73 32v128l57.53 15.97c26.21 7.28 53.01 13.12 80.31 15.05 32.69 2.31 65.6.67 97.58-6.2C472.9 481.3 512 429.22 512 384c0-64-84.18-96-174.54-96zM491.42 7.19C459.44.32 426.53-1.33 393.84.99c-27.3 1.93-54.1 7.77-80.31 15.04L256 32v128c60.2 0 79.94 15.62 104.73 32 28.57 18.88 69.82 32 104.73 32C555.82 224 640 192 640 128c0-45.22-39.1-97.3-148.58-120.81z" />
-  </Svg>
-);
-
-const BmiIcon = ({size = 32, color = '#10B981'}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <Path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 12h-2v-6h2v6zm0-8h-2V5h2v2z" />
-  </Svg>
-);
 const BackIcon = ({size = 24, color = '#FFFFFF'}) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+  <Svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth={2.5}
+    strokeLinecap="round"
+    strokeLinejoin="round">
     <Path d="M15 18l-6-6 6-6" />
   </Svg>
 );
@@ -57,7 +47,10 @@ interface PulsingViewProps {
   interval?: number;
 }
 
-const PulsingView: React.FC<PulsingViewProps> = ({children, interval = 1000}) => {
+const PulsingView: React.FC<PulsingViewProps> = ({
+  children,
+  interval = 1000,
+}) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -94,7 +87,12 @@ interface SlideUpCardProps {
   style?: ViewStyle;
 }
 
-const SlideUpCard: React.FC<SlideUpCardProps> = ({children, delay = 0, onPress, style}) => {
+const SlideUpCard: React.FC<SlideUpCardProps> = ({
+  children,
+  delay = 0,
+  onPress,
+  style,
+}) => {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -170,6 +168,8 @@ type SensorData = {
   height: number | null;
   heartRateTimestamp: any;
   stepCountTimestamp: any;
+  sleep: number | null;
+  sleepTimestamp: any;
 };
 
 const getLatestSensorValue = (sensorDoc: any) => {
@@ -233,22 +233,51 @@ const StudentDetail = ({route, navigation}: any) => {
           .collection('BMIdata')
           .doc('bodyMetrics')
           .get();
+        const sleepRef = firestore()
+          .collection('students')
+          .doc(studentId)
+          .collection('sensorData')
+          .doc('sleep')
+          .get();
 
-        const [heartRateDoc, stepCountDoc, weightDoc] = await Promise.all([
-          heartRateRef,
-          stepCountRef,
-          weightRef,
-        ]);
+        const [heartRateDoc, stepCountDoc, weightDoc, sleepDoc] =
+          await Promise.all([heartRateRef, stepCountRef, weightRef, sleepRef]);
 
         const latestHeartRate = getLatestSensorValue(heartRateDoc);
         const latestStepCount = getLatestSensorValue(stepCountDoc);
         const latestWeight = getLatestSensorValue(weightDoc);
+
+        let sleepVal = null;
+        let sleepTime = null;
+
+        if (sleepDoc.exists()) {
+          const sData = sleepDoc.data();
+
+          // 1. Check for 'latestSleep' (The structure from ManualSleepTracker)
+          if (sData?.latestSleep) {
+            sleepVal = sData.latestSleep.duration;
+            sleepTime = sData.latestSleep.timestamp;
+          }
+          // 2. Fallback: Check logs array if latestSleep is missing
+          else if (
+            sData?.logs &&
+            Array.isArray(sData.logs) &&
+            sData.logs.length > 0
+          ) {
+            // Get the last item in the array
+            const lastLog = sData.logs[sData.logs.length - 1];
+            sleepVal = lastLog.duration;
+            sleepTime = lastLog.timestamp;
+          }
+        }
 
         setSensorData({
           heartRate: latestHeartRate?.value || null,
           heartRateTimestamp: latestHeartRate?.timestamp || null,
           stepCount: latestStepCount?.value || null,
           stepCountTimestamp: latestStepCount?.timestamp || null,
+          sleep: sleepVal,
+          sleepTimestamp: sleepTime,
           weight: latestWeight?.weight || null,
           height: latestWeight?.height || null,
         });
@@ -304,8 +333,8 @@ const StudentDetail = ({route, navigation}: any) => {
     }
     // Updated to show Date + Time (e.g., "Dec 25, 5:16 PM")
     return timestamp.toDate().toLocaleString([], {
-      month: 'short',   // Adds "Dec"
-      day: 'numeric',   // Adds "25"
+      month: 'short', // Adds "Dec"
+      day: 'numeric', // Adds "25"
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -325,8 +354,12 @@ const StudentDetail = ({route, navigation}: any) => {
     return (
       <View style={[styles.fullContainer, styles.centerContainer]}>
         <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
-        <Text style={{color: '#EF4444', fontSize: 16, fontWeight: 'bold'}}>{error}</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={{marginTop: 20}}>
+        <Text style={{color: '#EF4444', fontSize: 16, fontWeight: 'bold'}}>
+          {error}
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{marginTop: 20}}>
           <Text style={{color: '#3b5998'}}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -341,16 +374,15 @@ const StudentDetail = ({route, navigation}: any) => {
         backgroundColor="transparent"
         translucent
       />
-      <TouchableOpacity 
-        style={styles.backButton} 
+      <TouchableOpacity
+        style={styles.backButton}
         onPress={() => navigation.goBack()}
-        activeOpacity={0.7}
-      >
+        activeOpacity={0.7}>
         <BackIcon size={24} color="#FFF" />
       </TouchableOpacity>
 
       {/* --- CUSTOM CURVED HEADER BACKGROUND --- */}
-     <View style={styles.headerBackground}>
+      <View style={styles.headerBackground}>
         <Svg
           height="100%"
           width={width}
@@ -373,7 +405,6 @@ const StudentDetail = ({route, navigation}: any) => {
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}>
-
         {/* --- PROFILE SECTION --- */}
         <Animated.View style={styles.profileSection}>
           <View style={styles.avatarWrapper}>
@@ -403,7 +434,11 @@ const StudentDetail = ({route, navigation}: any) => {
             <View style={styles.cardTopRow}>
               <View style={styles.iconCircleHeart}>
                 <PulsingView interval={800}>
-                  <HeartIcon size={28} color="#FF6F61" />
+                  <Image
+                    source={require('../Assets/heart-rate.png')}
+                    style={{width: 28, height: 28}}
+                    resizeMode="contain"
+                  />
                 </PulsingView>
               </View>
               <Text style={styles.timestampBadge}>
@@ -428,7 +463,11 @@ const StudentDetail = ({route, navigation}: any) => {
           <View style={[styles.cardInner, styles.cardSteps]}>
             <View style={styles.cardTopRow}>
               <View style={styles.iconCircleSteps}>
-                <StepIcon size={28} color="#6f5be1" />
+                <Image
+                    source={require('../Assets/burn.png')}
+                    style={{width: 28, height: 28}}
+                    resizeMode="contain"
+                  />
               </View>
               <Text style={styles.timestampBadge}>
                 {formatTimestamp(sensorData?.stepCountTimestamp)}
@@ -443,13 +482,42 @@ const StudentDetail = ({route, navigation}: any) => {
             <Text style={styles.subText}>Activity Analysis &rarr;</Text>
           </View>
         </SlideUpCard>
+        {/* --- CARD 3: SLEEP --- */}
+        <SlideUpCard
+          delay={250}
+          onPress={() => navigation.navigate('ManualSleepTracker', {studentId})}
+          style={styles.cardWrapper}>
+          <View style={[styles.cardInner, styles.cardSleep]}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.iconCircleSteps}>
+               <Image
+                    source={require('../Assets/moon.png')}
+                    style={{width: 28, height: 28}}
+                    resizeMode="contain"
+                  />
+              </View>
+              <Text style={styles.timestampBadge}>
+                {formatTimestamp(sensorData?.sleepTimestamp)}
+              </Text>
+            </View>
+            <View style={styles.valueContainer}>
+              <Text style={styles.bigValue}>{sensorData?.sleep || '--'}</Text>
+              <Text style={styles.unitLabel}>Hours</Text>
+            </View>
+            <Text style={styles.subText}>Activity Analysis &rarr;</Text>
+          </View>
+        </SlideUpCard>
 
         {/* --- CARD 3: BMI / METRICS --- */}
         <SlideUpCard delay={400} style={styles.cardWrapper}>
           <View style={[styles.cardInner, styles.cardBmi]}>
             <View style={styles.cardTopRow}>
               <View style={styles.iconCircleBmi}>
-                <BmiIcon size={28} color="#10B981" />
+                <Image
+                    source={require('../Assets/bmi.png')}
+                    style={{width: 28, height: 28}}
+                    resizeMode="contain"
+                  />
               </View>
               <Text style={styles.headerLabel}>Physical Stats</Text>
             </View>
@@ -458,14 +526,16 @@ const StudentDetail = ({route, navigation}: any) => {
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Weight</Text>
                 <Text style={styles.metricValue}>
-                  {sensorData?.weight || '--'} <Text style={styles.metricUnit}>kg</Text>
+                  {sensorData?.weight || '--'}{' '}
+                  <Text style={styles.metricUnit}>kg</Text>
                 </Text>
               </View>
               <View style={styles.dividerVertical} />
               <View style={styles.metricItem}>
                 <Text style={styles.metricLabel}>Height</Text>
                 <Text style={styles.metricValue}>
-                  {sensorData?.height || '--'} <Text style={styles.metricUnit}>cm</Text>
+                  {sensorData?.height || '--'}{' '}
+                  <Text style={styles.metricUnit}>cm</Text>
                 </Text>
               </View>
             </View>
@@ -607,6 +677,10 @@ const styles = StyleSheet.create({
   },
   cardSteps: {
     borderLeftWidth: 6,
+    borderLeftColor: '#d16116ff',
+  },
+  cardSleep: {
+    borderLeftWidth: 6,
     borderLeftColor: '#6f5be1',
   },
   cardBmi: {
@@ -621,19 +695,28 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   iconCircleHeart: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: 'rgba(255, 111, 97, 0.1)',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconCircleSteps: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: 'rgba(111, 91, 225, 0.1)',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconCircleBmi: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    justifyContent: 'center', alignItems: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   timestampBadge: {
     backgroundColor: '#F3F4F6',

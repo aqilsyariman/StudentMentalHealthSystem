@@ -35,7 +35,7 @@ const SleepIcon = ({size = 48}) => (
   </Svg>
 );
 
-const ManualSleepTracker = ({}: any) => {
+const ManualSleepTracker = ({route}: any) => {
   const [bedTime, setBedTime] = useState(new Date());
   const [wakeTime, setWakeTime] = useState(new Date());
   const [showBedTimePicker, setShowBedTimePicker] = useState(false);
@@ -48,14 +48,20 @@ const ManualSleepTracker = ({}: any) => {
 
   const user = auth().currentUser;
 
+  // --- LOGIC CHANGE: DETERMINE TARGET USER ---
+  // If studentId is passed (Counselor View), use it. Otherwise use current user (Student View).
+  const { studentId } = route?.params || {};
+  const targetUid = studentId || user?.uid;
+  const isReadOnly = !!studentId; // Disable editing if viewing a student
+
   useEffect(() => {
-    if (!user) return;
+    if (!targetUid) return;
 
     const fetchSleepLogs = async () => {
       try {
         const sleepDoc = await firestore()
           .collection('students')
-          .doc(user.uid)
+          .doc(targetUid) // Using targetUid instead of user.uid
           .collection('sensorData')
           .doc('sleep')
           .get();
@@ -91,7 +97,7 @@ const ManualSleepTracker = ({}: any) => {
     };
 
     fetchSleepLogs();
-  }, [user]);
+  }, [targetUid]);
 
   const calculateDuration = (bed: Date, wake: Date) => {
     const diff = wake.getTime() - bed.getTime();
@@ -122,6 +128,12 @@ const ManualSleepTracker = ({}: any) => {
   };
 
   const handleSaveSleep = async () => {
+    // Safety check: Counselors cannot save
+    if (isReadOnly) {
+        Alert.alert("Permission Denied", "Counselors cannot log sleep for students.");
+        return;
+    }
+
     if (!user) {
       Alert.alert('Error', 'You must be logged in to save sleep data.');
       return;
@@ -197,6 +209,8 @@ const ManualSleepTracker = ({}: any) => {
   };
 
   const handleDeleteLog = async (logIndex: number) => {
+    // Safety check: Counselors cannot delete
+    if (isReadOnly) return;
     if (!user) return;
 
     Alert.alert(
@@ -328,7 +342,15 @@ const ManualSleepTracker = ({}: any) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-
+      
+      {/* 1. Show message if no logs are found (instead of blank screen) */}
+      {allLogs.length === 0 && (
+        <View style={styles.card}>
+          <Text style={{textAlign: 'center', color: '#666', paddingVertical: 20, fontSize: 16}}>
+            {isReadOnly ? 'No sleep records found for this student.' : 'No sleep logs yet. Add one below!'}
+          </Text>
+        </View>
+      )}
 
       {/* Sleep Stats Card */}
       {allLogs.length > 0 && (
@@ -399,116 +421,121 @@ const ManualSleepTracker = ({}: any) => {
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Log New Sleep</Text>
+      {/* 2. ONLY Show Input Form if NOT ReadOnly (i.e. if logged in as student) */}
+      {!isReadOnly && (
+        <>
+          <Text style={styles.sectionTitle}>Log New Sleep</Text>
 
-      {/* Bed Time Picker */}
-      <View style={styles.card}>
-        <Text style={styles.label}>🌙 Bed Time</Text>
-        <TouchableOpacity
-          style={styles.timeButton}
-          onPress={() => setShowBedTimePicker(true)}>
-          <Text style={styles.timeText}>
-            {formatDate(bedTime)} at {formatTime(bedTime)}
-          </Text>
-        </TouchableOpacity>
+          {/* Bed Time Picker */}
+          <View style={styles.card}>
+            <Text style={styles.label}>🌙 Bed Time</Text>
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setShowBedTimePicker(true)}>
+              <Text style={styles.timeText}>
+                {formatDate(bedTime)} at {formatTime(bedTime)}
+              </Text>
+            </TouchableOpacity>
 
-        {showBedTimePicker && (
-          <View style={styles.pickerContainer}>
-            <DateTimePicker
-              value={bedTime}
-              mode="datetime"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                setShowBedTimePicker(Platform.OS === 'ios');
-                if (selectedDate) {
-                  setBedTime(selectedDate);
-                }
-              }}
-              textColor="#1F2937"
-              style={styles.picker}
-            />
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={styles.doneButton}
-                onPress={() => setShowBedTimePicker(false)}>
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-
-      {/* Wake Time Picker */}
-      <View style={styles.card}>
-        <Text style={styles.label}>☀️ Wake Time</Text>
-        <TouchableOpacity
-          style={styles.timeButton}
-          onPress={() => setShowWakeTimePicker(true)}>
-          <Text style={styles.timeText}>
-            {formatDate(wakeTime)} at {formatTime(wakeTime)}
-          </Text>
-        </TouchableOpacity>
-
-        {showWakeTimePicker && (
-          <View style={styles.pickerContainer}>
-            <DateTimePicker
-              value={wakeTime}
-              mode="datetime"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={(event, selectedDate) => {
-                setShowWakeTimePicker(Platform.OS === 'ios');
-                if (selectedDate) {
-                  setWakeTime(selectedDate);
-                }
-              }}
-              textColor="#1F2937"
-              style={styles.picker}
-            />
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={styles.doneButton}
-                onPress={() => setShowWakeTimePicker(false)}>
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-
-      {/* Duration Display */}
-      {wakeTime > bedTime && (
-        <View style={styles.durationCard}>
-          <SleepIcon size={40} />
-          <View style={styles.durationContent}>
-            <Text style={styles.durationLabel}>Sleep Duration</Text>
-            <Text style={styles.durationValue}>
-              {calculateDuration(bedTime, wakeTime).toFixed(1)} hours
-            </Text>
-            <View style={styles.scoreAndQualityRow}>
-              <View style={[styles.qualityBadge, {backgroundColor: getSleepQuality(calculateDuration(bedTime, wakeTime)).color + '20'}]}>
-                <Text style={[styles.qualityText, {color: getSleepQuality(calculateDuration(bedTime, wakeTime)).color}]}>
-                  {getSleepQuality(calculateDuration(bedTime, wakeTime)).text}
-                </Text>
+            {showBedTimePicker && (
+              <View style={styles.pickerContainer}>
+                <DateTimePicker
+                  value={bedTime}
+                  mode="datetime"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowBedTimePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setBedTime(selectedDate);
+                    }
+                  }}
+                  textColor="#1F2937"
+                  style={styles.picker}
+                />
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity
+                    style={styles.doneButton}
+                    onPress={() => setShowBedTimePicker(false)}>
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={[styles.scoreBadge, {backgroundColor: getScoreColor(calculateSleepScore(calculateDuration(bedTime, wakeTime))) + '20'}]}>
-                <Text style={[styles.scoreText, {color: getScoreColor(calculateSleepScore(calculateDuration(bedTime, wakeTime)))}]}>
-                  Score: {Math.round(calculateSleepScore(calculateDuration(bedTime, wakeTime)))}
+            )}
+          </View>
+
+          {/* Wake Time Picker */}
+          <View style={styles.card}>
+            <Text style={styles.label}>☀️ Wake Time</Text>
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setShowWakeTimePicker(true)}>
+              <Text style={styles.timeText}>
+                {formatDate(wakeTime)} at {formatTime(wakeTime)}
+              </Text>
+            </TouchableOpacity>
+
+            {showWakeTimePicker && (
+              <View style={styles.pickerContainer}>
+                <DateTimePicker
+                  value={wakeTime}
+                  mode="datetime"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowWakeTimePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setWakeTime(selectedDate);
+                    }
+                  }}
+                  textColor="#1F2937"
+                  style={styles.picker}
+                />
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity
+                    style={styles.doneButton}
+                    onPress={() => setShowWakeTimePicker(false)}>
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Duration Display */}
+          {wakeTime > bedTime && (
+            <View style={styles.durationCard}>
+              <SleepIcon size={40} />
+              <View style={styles.durationContent}>
+                <Text style={styles.durationLabel}>Sleep Duration</Text>
+                <Text style={styles.durationValue}>
+                  {calculateDuration(bedTime, wakeTime).toFixed(1)} hours
                 </Text>
+                <View style={styles.scoreAndQualityRow}>
+                  <View style={[styles.qualityBadge, {backgroundColor: getSleepQuality(calculateDuration(bedTime, wakeTime)).color + '20'}]}>
+                    <Text style={[styles.qualityText, {color: getSleepQuality(calculateDuration(bedTime, wakeTime)).color}]}>
+                      {getSleepQuality(calculateDuration(bedTime, wakeTime)).text}
+                    </Text>
+                  </View>
+                  <View style={[styles.scoreBadge, {backgroundColor: getScoreColor(calculateSleepScore(calculateDuration(bedTime, wakeTime))) + '20'}]}>
+                    <Text style={[styles.scoreText, {color: getScoreColor(calculateSleepScore(calculateDuration(bedTime, wakeTime)))}]}>
+                      Score: {Math.round(calculateSleepScore(calculateDuration(bedTime, wakeTime)))}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
-          </View>
-        </View>
-      )}
+          )}
 
-      {/* Save Button */}
-      <TouchableOpacity
-        style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-        onPress={handleSaveSleep}
-        disabled={loading}>
-        <Text style={styles.saveButtonText}>
-          {loading ? 'Saving...' : '💾 Save Sleep Log'}
-        </Text>
-      </TouchableOpacity>
+          {/* Save Button */}
+          <TouchableOpacity
+            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+            onPress={handleSaveSleep}
+            disabled={loading}>
+            <Text style={styles.saveButtonText}>
+              {loading ? 'Saving...' : '💾 Save Sleep Log'}
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* Recent Logs */}
       {recentLogs.length > 0 && (
@@ -548,13 +575,15 @@ const ManualSleepTracker = ({}: any) => {
                   <Text style={styles.logDuration}>{log.duration.toFixed(1)}h</Text>
                 </View>
                 
-                {/* Delete Button */}
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDeleteLog(index)}
-                  disabled={loading}>
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
+                {/* 3. ONLY Show Delete Button if NOT ReadOnly */}
+                {!isReadOnly && (
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteLog(index)}
+                    disabled={loading}>
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}

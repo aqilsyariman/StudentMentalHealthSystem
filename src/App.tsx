@@ -268,6 +268,15 @@ const App = () => {
               name="StepsGraph"
               component={StepsGraph}
             />
+             <Stack.Screen
+              options={{headerShown: true, title: 'Sleep Tracker',headerStyle: {
+                  backgroundColor: '#eef1ff', // Your color here
+                },
+                headerTintColor: '#6366f1',
+              }}
+              name="ManualSleepTracker"
+              component={ManualSleepTracker}
+            />
             <Stack.Screen
               options={{headerShown: false, title: 'Messages'}}
               name="Messages"

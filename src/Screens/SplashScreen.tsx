@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, Image, StyleSheet, Animated} from 'react-native';
+import {View, Text, StyleSheet, Animated} from 'react-native';
 
 const SplashScreen = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -28,11 +28,7 @@ const SplashScreen = () => {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, {opacity: fadeAnim}]}>
-        <Image
-          testID="logo"
-          source={require('../Assets/new login logo.png')}
-          style={styles.logo}
-        />
+        
         <Text style={styles.welcomeText}>Welcome</Text>
         <View style={styles.progressBarContainer}>
           <View
