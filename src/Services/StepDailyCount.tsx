@@ -8,7 +8,6 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 
 // --- STEP COUNT SCORING CONSTANTS ---
-
 const calculateStepCountScore = (steps: number): number => {
   if (steps === null || steps === undefined || steps < 0) return 0;
   
@@ -63,7 +62,26 @@ export const getDailyStepCount = (
         return;
       }
 
-      console.log(`📊 Found ${results.length} step samples`);
+      console.log(`📊 Found ${results.length} total samples`);
+
+      // ---------------------------------------------------------
+      // 🔍 DEBUG LOG: SHOW RAW JSON FOR TODAY ONLY
+      // ---------------------------------------------------------
+      const todayString = getLocalDateString(new Date());
+      const todaysSamples = results.filter(sample => {
+        const sampleDate = new Date(sample.endDate || sample.startDate);
+        return getLocalDateString(sampleDate) === todayString;
+      });
+
+      if (todaysSamples.length > 0) {
+        console.log('↓↓↓↓↓ RAW JSON DATA FOR TODAY ↓↓↓↓↓');
+        console.log(JSON.stringify(todaysSamples, null, 2));
+        console.log('↑↑↑↑↑ END RAW DATA ↑↑↑↑↑');
+      } else {
+        console.log('⚠️ No raw samples found specifically for today.');
+      }
+      // ---------------------------------------------------------
+
 
       // ✅ Group samples by date and sum steps + track latest timestamp per day
       const stepsByDate: { 
@@ -111,7 +129,7 @@ export const getDailyStepCount = (
         
         console.log(`✅ Selected most recent day: ${dateKey} with ${totalSteps} total steps`);
         console.log(`   Last recorded at: ${latestTimestamp.toLocaleString()}`);
-        break; // Stop immediately after selecting the most recent day
+        break; 
       }
 
       if (!selectedDate || !latestTimestamp) {
@@ -141,6 +159,7 @@ export const getDailyStepCount = (
             const dayData = existingData.data[selectedDate];
             const lastReading = dayData[dayData.length - 1];
             
+            // Check if value is identical to avoid spamming DB
             if (lastReading?.value === totalSteps) {
               console.log('⏭️ Same step count for this day, using existing timestamp');
               shouldUpdate = false;
@@ -148,7 +167,6 @@ export const getDailyStepCount = (
             }
           }
 
-          // Use the existing timestamp if found, otherwise create a new one from the latest HealthKit timestamp.
           const timestampToUse = existingTimestamp || firestore.Timestamp.fromDate(latestTimestamp);
           
           const readingData = {
@@ -158,10 +176,11 @@ export const getDailyStepCount = (
           };
 
           if (shouldUpdate) {
+            // ⭐ CHANGED THIS LINE: Used arrayUnion to APPEND history, not overwrite it
             await sensorDocRef.set(
               {
                 data: {
-                  [selectedDate]: [readingData],
+                  [selectedDate]: firestore.FieldValue.arrayUnion(readingData),
                 },
               },
               { merge: true }
@@ -170,7 +189,6 @@ export const getDailyStepCount = (
             console.log(`✅ Saved step count: ${totalSteps} steps (Score: ${stepCountScore}) for ${selectedDate}`);
           }
 
-          // Return with the correct timestamp
           const displayDate = existingTimestamp 
             ? existingTimestamp.toDate().toISOString() 
             : latestTimestamp.toISOString();

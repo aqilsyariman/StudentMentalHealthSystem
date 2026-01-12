@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   Platform,
   FlatList,
   StatusBar,
-  SafeAreaView // Added for the PDF Preview modal mainly
+  SafeAreaView, // Added for the PDF Preview modal mainly
+  Image,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
+import {WebView} from 'react-native-webview';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import DateTimePicker, {
@@ -23,7 +24,7 @@ import firestore, {
   FirebaseFirestoreTypes,
 } from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 
 // --- CONSTANTS & LOGIC (UNTOUCHED) ---
 const ANSWER_KEYS = [
@@ -94,7 +95,7 @@ interface ReportData {
   wellness: {
     date: string;
     finalScore: number;
-    breakdown: { bp: number; hr: number; sleep: number; steps: number };
+    breakdown: {bp: number; hr: number; sleep: number; steps: number};
   };
   sensors: {
     bp: SensorDisplayData;
@@ -117,7 +118,7 @@ const formatTime = (fsTimestamp: any) => {
   const date = fsTimestamp.toDate
     ? fsTimestamp.toDate()
     : new Date(fsTimestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 };
 
 const formatDateDisplay = (date: Date) => {
@@ -138,21 +139,23 @@ const getSeverityColor = (result: string) => {
 
 // --- UI COMPONENTS (COPIED FROM SCHEDULE) ---
 
-const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) => {
+const ModernHeader = ({title, subtitle}: {title: string; subtitle: string}) => {
   const navigation = useNavigation();
 
   return (
     <View style={styles.headerContainer}>
       <View style={styles.headerTopRow}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        
-        <View style={styles.headerIconContainer}>
-          <Text style={styles.headerIcon}>📑</Text>
+
+        <View >
+          <Image
+            source={require('../Assets/medical-record.png')}
+            style={styles.headerIconImage}
+          />
         </View>
       </View>
 
@@ -178,7 +181,9 @@ const ReportScreen = () => {
 
   // Data State
   const [myStudents, setMyStudents] = useState<StudentSummary[]>([]);
-  const [selectedStudent, setSelectedStudent] = useState<StudentSummary | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentSummary | null>(
+    null,
+  );
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [reportData, setReportData] = useState<ReportData | null>(null);
 
@@ -353,7 +358,7 @@ const ReportScreen = () => {
           name: userData.fullName || selectedStudent.name,
           dob: formattedDOB,
           age: userData.age || '-',
-          gender: userData.gender || '-', 
+          gender: userData.gender || '-',
           generatedDate: formatDateDisplay(new Date()),
         },
         gad7: {
@@ -616,40 +621,53 @@ const ReportScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-      
-      <ModernHeader title="Wellness Report" subtitle="Generate Clinical Summaries" />
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-      >
+      <ModernHeader
+        title="Wellness Report"
+        subtitle="Generate Clinical Summaries"
+      />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
         {/* 1. SELECTION AREA */}
-        
+
         {/* Student Selector Card */}
-        <TouchableOpacity style={styles.studentSelectorCard} onPress={() => setStudentModalVisible(true)} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={styles.studentSelectorCard}
+          onPress={() => setStudentModalVisible(true)}
+          activeOpacity={0.9}>
           <View>
             <Text style={styles.cardLabel}>Student</Text>
-            <Text style={[styles.studentSelectorText, !selectedStudent && styles.placeholderText]}>
+            <Text
+              style={[
+                styles.studentSelectorText,
+                !selectedStudent && styles.placeholderText,
+              ]}>
               {selectedStudent ? selectedStudent.name : 'Select Student...'}
             </Text>
           </View>
           <View style={styles.arrowContainer}>
-             <Text style={styles.arrowText}>↓</Text>
+            <Text style={styles.arrowText}>↓</Text>
           </View>
         </TouchableOpacity>
 
         {/* Date Selector Card */}
         <View style={styles.formCard}>
-            <Text style={styles.sectionLabel}>Report Period</Text>
-            <TouchableOpacity style={styles.dateTimeBox} onPress={() => setShowDatePicker(true)}>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Text style={{fontSize: 24, marginRight: 12}}>📅</Text>
-                    <View>
-                        <Text style={styles.dateTimeLabel}>Selected Date</Text>
-                        <Text style={styles.dateTimeValue}>{formatDateDisplay(selectedDate)}</Text>
-                    </View>
-                </View>
-            </TouchableOpacity>
+          <Text style={styles.sectionLabel}>Report Period</Text>
+          <TouchableOpacity
+            style={styles.dateTimeBox}
+            onPress={() => setShowDatePicker(true)}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+        
+              <View>
+                <Text style={styles.dateTimeLabel}>Selected Date</Text>
+                <Text style={styles.dateTimeValue}>
+                  {formatDateDisplay(selectedDate)}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {showDatePicker && (
@@ -672,90 +690,180 @@ const ReportScreen = () => {
         ) : selectedStudent && reportData ? (
           <>
             {/* WELLNESS SCORE CARD */}
-            <View style={[styles.formCard, { marginTop: 20 }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={[styles.formCard, {marginTop: 20}]}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
                 <Text style={styles.sectionLabel}>Physiological Status</Text>
-                <View style={[styles.statusBadge, { backgroundColor: reportData.sensors.hr.value !== '-' ? '#DCFCE7' : '#FEE2E2' }]}>
-                   <Text style={[styles.statusBadgeText, { color: reportData.sensors.hr.value !== '-' ? '#166534' : '#991B1B' }]}>
-                     {reportData.sensors.hr.value !== '-' ? 'Active Data' : 'No Sensors'}
-                   </Text>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor:
+                        reportData.sensors.hr.value !== '-'
+                          ? '#DCFCE7'
+                          : '#FEE2E2',
+                    },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      {
+                        color:
+                          reportData.sensors.hr.value !== '-'
+                            ? '#166534'
+                            : '#991B1B',
+                      },
+                    ]}>
+                    {reportData.sensors.hr.value !== '-'
+                      ? 'Active Data'
+                      : 'No Sensors'}
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.divider} />
 
-              <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                  <Text style={{ fontSize: 48, fontWeight: '800', color: '#1E293B' }}>{reportData.wellness.finalScore}</Text>
-                  <Text style={{ fontSize: 14, color: '#64748B', fontWeight: '600', textTransform: 'uppercase' }}>Wellness Score</Text>
+              <View style={{alignItems: 'center', marginVertical: 10}}>
+                <Text
+                  style={{fontSize: 48, fontWeight: '800', color: '#1E293B'}}>
+                  {reportData.wellness.finalScore}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: '#64748B',
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                  }}>
+                  Wellness Score
+                </Text>
               </View>
 
               <View style={styles.infoRow}>
-                 <Text style={styles.infoText}>{reportData.student.name} ({reportData.student.age} y/o)</Text>
-                 <Text style={styles.infoText}>Sex: {reportData.student.gender}</Text>
+                <Text style={styles.infoText}>
+                  {reportData.student.name} ({reportData.student.age} y/o)
+                </Text>
+                <Text style={styles.infoText}>
+                  Sex: {reportData.student.gender}
+                </Text>
               </View>
             </View>
 
             {/* CLINICAL ASSESSMENTS CARD */}
-            <View style={[styles.formCard, { marginTop: 20 }]}>
+            <View style={[styles.formCard, {marginTop: 20}]}>
               <Text style={styles.sectionLabel}>Clinical Assessments</Text>
-              
+
               {/* Anxiety Block */}
               <View style={styles.assessmentBlock}>
-                 <View style={{flex: 1}}>
-                    <Text style={styles.assessmentTitle}>Anxiety (GAD-7)</Text>
-                    <Text style={styles.assessmentDate}>Last: {reportData.gad7.date}</Text>
-                 </View>
-                 <View style={{alignItems: 'flex-end'}}>
-                    <View style={[styles.chip, { backgroundColor: getSeverityColor(reportData.gad7.result) + '20', borderColor: 'transparent', paddingVertical: 4 }]}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: getSeverityColor(reportData.gad7.result), textTransform: 'uppercase' }}>
-                            {reportData.gad7.result}
-                        </Text>
-                    </View>
-                    <Text style={styles.scoreSmall}>Score: {reportData.gad7.score}/21</Text>
-                 </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.assessmentTitle}>Anxiety (GAD-7)</Text>
+                  <Text style={styles.assessmentDate}>
+                    Last: {reportData.gad7.date}
+                  </Text>
+                </View>
+                <View style={{alignItems: 'flex-end'}}>
+                  <View
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor:
+                          getSeverityColor(reportData.gad7.result) + '20',
+                        borderColor: 'transparent',
+                        paddingVertical: 4,
+                      },
+                    ]}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: getSeverityColor(reportData.gad7.result),
+                        textTransform: 'uppercase',
+                      }}>
+                      {reportData.gad7.result}
+                    </Text>
+                  </View>
+                  <Text style={styles.scoreSmall}>
+                    Score: {reportData.gad7.score}/21
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.divider} />
 
               {/* Depression Block */}
               <View style={styles.assessmentBlock}>
-                 <View style={{flex: 1}}>
-                    <Text style={styles.assessmentTitle}>Depression (PHQ-9)</Text>
-                    <Text style={styles.assessmentDate}>Last: {reportData.phq9.date}</Text>
-                 </View>
-                 <View style={{alignItems: 'flex-end'}}>
-                    <View style={[styles.chip, { backgroundColor: getSeverityColor(reportData.phq9.result) + '20', borderColor: 'transparent', paddingVertical: 4 }]}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: getSeverityColor(reportData.phq9.result), textTransform: 'uppercase' }}>
-                            {reportData.phq9.result}
-                        </Text>
-                    </View>
-                    <Text style={styles.scoreSmall}>Score: {reportData.phq9.score}/27</Text>
-                 </View>
+                <View style={{flex: 1}}>
+                  <Text style={styles.assessmentTitle}>Depression (PHQ-9)</Text>
+                  <Text style={styles.assessmentDate}>
+                    Last: {reportData.phq9.date}
+                  </Text>
+                </View>
+                <View style={{alignItems: 'flex-end'}}>
+                  <View
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor:
+                          getSeverityColor(reportData.phq9.result) + '20',
+                        borderColor: 'transparent',
+                        paddingVertical: 4,
+                      },
+                    ]}>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color: getSeverityColor(reportData.phq9.result),
+                        textTransform: 'uppercase',
+                      }}>
+                      {reportData.phq9.result}
+                    </Text>
+                  </View>
+                  <Text style={styles.scoreSmall}>
+                    Score: {reportData.phq9.score}/27
+                  </Text>
+                </View>
               </View>
             </View>
           </>
         ) : (
           <View style={styles.emptyState}>
-             <Text style={styles.emptyStateText}>Ready to Generate</Text>
-             <Text style={styles.emptyStateSubtext}>Select a student and date to view clinical data.</Text>
+            <Text style={styles.emptyStateText}>Ready to Generate</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Select a student and date to view clinical data.
+            </Text>
           </View>
         )}
 
         {/* 3. ACTIONS */}
         <View style={{marginTop: 30, paddingBottom: 40}}>
           <TouchableOpacity
-            style={[styles.outlineButton, (!selectedStudent || fetchingData) && styles.disabledButton]}
+            style={[
+              styles.outlineButton,
+              (!selectedStudent || fetchingData) && styles.disabledButton,
+            ]}
             onPress={() => setPreviewVisible(true)}
-            disabled={!selectedStudent || fetchingData}
-          >
-            <Text style={[styles.outlineButtonText, (!selectedStudent || fetchingData) && {color: '#fff'}]}>Preview Document</Text>
+            disabled={!selectedStudent || fetchingData}>
+            <Text
+              style={[
+                styles.outlineButtonText,
+                (!selectedStudent || fetchingData) && {color: '#fff'},
+              ]}>
+              Preview Document
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.submitButton, (!selectedStudent || fetchingData) && styles.disabledButton]}
+            style={[
+              styles.submitButton,
+              (!selectedStudent || fetchingData) && styles.disabledButton,
+            ]}
             onPress={handleExport}
-            disabled={!selectedStudent || fetchingData}
-          >
+            disabled={!selectedStudent || fetchingData}>
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -766,46 +874,57 @@ const ReportScreen = () => {
       </ScrollView>
 
       {/* STUDENT MODAL */}
-      <Modal visible={studentModalVisible} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={studentModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Student</Text>
-            <TouchableOpacity onPress={() => setStudentModalVisible(false)} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={() => setStudentModalVisible(false)}
+              style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-            <FlatList
-              data={myStudents}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 16 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.studentItem}
-                  onPress={() => {
-                    setSelectedStudent(item);
-                    setStudentModalVisible(false);
-                  }}
-                >
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.studentInfo}>
-                    <Text style={styles.studentName}>{item.name}</Text>
-                    <Text style={styles.studentEmail}>{item.email}</Text>
-                  </View>
-                  <Text style={styles.selectAction}>Select</Text>
-                </TouchableOpacity>
-              )}
-            />
+          <FlatList
+            data={myStudents}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{padding: 16}}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={styles.studentItem}
+                onPress={() => {
+                  setSelectedStudent(item);
+                  setStudentModalVisible(false);
+                }}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {item.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.studentInfo}>
+                  <Text style={styles.studentName}>{item.name}</Text>
+                  <Text style={styles.studentEmail}>{item.email}</Text>
+                </View>
+                <Text style={styles.selectAction}>Select</Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
       </Modal>
 
       {/* PDF PREVIEW MODAL */}
-      <Modal visible={previewVisible} animationType="slide" presentationStyle="fullScreen">
+      <Modal
+        visible={previewVisible}
+        animationType="slide"
+        presentationStyle="fullScreen">
         <SafeAreaView style={{flex: 1, backgroundColor: '#F8FAFC'}}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Report Preview</Text>
-            <TouchableOpacity onPress={() => setPreviewVisible(false)} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={() => setPreviewVisible(false)}
+              style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>Close</Text>
             </TouchableOpacity>
           </View>
@@ -830,7 +949,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 10,
   },
-  
+
   // Header Styles
   headerContainer: {
     backgroundColor: '#4F46E5',
@@ -862,18 +981,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#FFFFFF',
     fontWeight: 'bold',
-    marginTop: -2, 
+    marginTop: -2,
   },
-  headerIconContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconImage: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    fontSize: 20,
+    marginRight: 8,
+    resizeMode: 'contain',
   },
   headerTextContainer: {
     zIndex: 2,
@@ -912,7 +1030,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 20,
     shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {width: 0, height: 10},
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 8,
@@ -952,7 +1070,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 4,
@@ -1053,7 +1171,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 16,
     shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 10,
@@ -1117,7 +1235,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,

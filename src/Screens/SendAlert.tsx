@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -11,38 +11,42 @@ import {
   Platform,
   ScrollView,
   StatusBar,
+  Image,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import { useNavigation } from '@react-navigation/native';
-import Animated, { 
-  FadeInDown, 
-  FadeInUp, 
-  withSpring, 
-  useSharedValue, 
-  withSequence 
+import {useNavigation} from '@react-navigation/native';
+import Animated, {
+  FadeInDown,
+  FadeInUp,
+  withSpring,
+  useSharedValue,
+  withSequence,
 } from 'react-native-reanimated';
 
 // --- COMPONENTS ---
 
 // 1. Modern Header (Same as Schedule Screen)
-const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) => {
+const ModernHeader = ({title, subtitle}: {title: string; subtitle: string}) => {
   const navigation = useNavigation();
 
   return (
     <View style={styles.headerContainer}>
       {/* Top Row: Back Button & Icon */}
       <View style={styles.headerTopRow}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        
-        <View style={styles.headerIconContainer}>
-          <Text style={styles.headerIcon}>🔔</Text>
-        </View>
+
+        <Image
+          source={require('../Assets/warning (1).png')}
+          style={[
+            styles.headerIconImage,
+            {tintColor: '#352cdfff'}, // change color here
+          ]}
+        />
       </View>
 
       {/* Title Section */}
@@ -58,7 +62,8 @@ const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) 
 };
 
 // 2. Animated Touchable for interactive elements
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
 
 const SendAlertScreen = () => {
   const [students, setStudents] = useState<any[]>([]);
@@ -66,9 +71,13 @@ const SendAlertScreen = () => {
   const [sending, setSending] = useState(false);
 
   // Form State
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
   const [message, setMessage] = useState('');
-  const [severity, setSeverity] = useState<'info' | 'warning' | 'critical'>('info');
+  const [severity, setSeverity] = useState<'info' | 'warning' | 'critical'>(
+    'info',
+  );
 
   // Animation Values
   const buttonScale = useSharedValue(1);
@@ -116,20 +125,22 @@ const SendAlertScreen = () => {
     setSending(true);
     // Button Bounce Animation
     buttonScale.value = withSequence(withSpring(0.95), withSpring(1));
-    
+
     const counselorId = auth().currentUser?.uid;
 
     try {
-      await firestore().collection('notifications').add({
-        recipientId: selectedStudentId,
-        senderId: counselorId,
-        title: getTitleBySeverity(severity),
-        message: message,
-        type: 'alert',
-        severity: severity,
-        read: false,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      });
+      await firestore()
+        .collection('notifications')
+        .add({
+          recipientId: selectedStudentId,
+          senderId: counselorId,
+          title: getTitleBySeverity(severity),
+          message: message,
+          type: 'alert',
+          severity: severity,
+          read: false,
+          createdAt: firestore.FieldValue.serverTimestamp(),
+        });
 
       Alert.alert('Sent!', 'Your alert has been delivered.', [
         {text: 'Done', onPress: () => navigation.goBack()},
@@ -150,63 +161,72 @@ const SendAlertScreen = () => {
 
   const getSeverityStyle = (level: string) => {
     switch (level) {
-      case 'critical': return { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' };
-      case 'warning': return { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' };
-      default: return { bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE' }; // Info
+      case 'critical':
+        return {bg: '#FEF2F2', text: '#DC2626', border: '#FECACA'};
+      case 'warning':
+        return {bg: '#FFFBEB', text: '#D97706', border: '#FDE68A'};
+      default:
+        return {bg: '#EFF6FF', text: '#2563EB', border: '#BFDBFE'}; // Info
     }
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
+      style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-      
+
       <ModernHeader title="New Alert" subtitle="Notify a student instantly" />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
         {/* 1. SEVERITY SELECTOR */}
-        <Animated.View style={styles.formCard} entering={FadeInDown.delay(100).duration(600)}>
+        <Animated.View
+          style={styles.formCard}
+          entering={FadeInDown.delay(100).duration(600)}>
           <Text style={styles.sectionLabel}>Priority Level</Text>
           <View style={styles.severityContainer}>
-            {['info', 'warning', 'critical'].map((level) => {
+            {['info', 'warning', 'critical'].map(level => {
               const isSelected = severity === level;
               const style = getSeverityStyle(level);
               return (
-                 <TouchableOpacity
-                    key={level}
-                    activeOpacity={0.7}
-                    onPress={() => setSeverity(level as any)}
+                <TouchableOpacity
+                  key={level}
+                  activeOpacity={0.7}
+                  onPress={() => setSeverity(level as any)}
+                  style={[
+                    styles.severityCard,
+                    {
+                      backgroundColor: isSelected ? style.bg : '#F8FAFC',
+                      borderColor: isSelected ? style.border : '#F1F5F9',
+                    },
+                  ]}>
+                  <Text
                     style={[
-                      styles.severityCard,
-                      { 
-                        backgroundColor: isSelected ? style.bg : '#F8FAFC',
-                        borderColor: isSelected ? style.border : '#F1F5F9',
-                      }
-                    ]}
-                 >
-                    
-                    <Text style={[
                       styles.severityText,
-                      { color: isSelected ? style.text : '#64748B' }
+                      {color: isSelected ? style.text : '#64748B'},
                     ]}>
-                      {level.charAt(0).toUpperCase() + level.slice(1)}
-                    </Text>
-                 </TouchableOpacity>
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </Text>
+                </TouchableOpacity>
               );
             })}
           </View>
         </Animated.View>
 
         {/* 2. RECIPIENT SELECTOR */}
-        <Animated.View style={[styles.formCard, { marginTop: 20 }]} entering={FadeInDown.delay(200).duration(600)}>
+        <Animated.View
+          style={[styles.formCard, {marginTop: 20}]}
+          entering={FadeInDown.delay(200).duration(600)}>
           <Text style={styles.sectionLabel}>Select Student</Text>
           {loading ? (
             <ActivityIndicator color="#4F46E5" />
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.studentScroll}>
               {students.map((student, index) => {
                 const isSelected = selectedStudentId === student.id;
                 return (
@@ -217,19 +237,29 @@ const SendAlertScreen = () => {
                     onPress={() => setSelectedStudentId(student.id)}
                     style={[
                       styles.studentCard,
-                      isSelected && styles.studentCardSelected
-                    ]}
-                  >
-                    <View style={[
-                      styles.avatar,
-                      isSelected ? { backgroundColor: '#4F46E5' } : { backgroundColor: '#EEF2FF' }
+                      isSelected && styles.studentCardSelected,
                     ]}>
-                      <Text style={[
-                        styles.avatarText,
-                        isSelected ? { color: '#FFF' } : { color: '#4F46E5' }
-                      ]}>{student.initials}</Text>
+                    <View
+                      style={[
+                        styles.avatar,
+                        isSelected
+                          ? {backgroundColor: '#4F46E5'}
+                          : {backgroundColor: '#EEF2FF'},
+                      ]}>
+                      <Text
+                        style={[
+                          styles.avatarText,
+                          isSelected ? {color: '#FFF'} : {color: '#4F46E5'},
+                        ]}>
+                        {student.initials}
+                      </Text>
                     </View>
-                    <Text numberOfLines={1} style={[styles.studentName, isSelected && styles.studentNameSelected]}>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.studentName,
+                        isSelected && styles.studentNameSelected,
+                      ]}>
                       {student.name.split(' ')[0]}
                     </Text>
                   </AnimatedTouchableOpacity>
@@ -240,7 +270,9 @@ const SendAlertScreen = () => {
         </Animated.View>
 
         {/* 3. MESSAGE INPUT */}
-        <Animated.View style={[styles.formCard, { marginTop: 20 }]} entering={FadeInDown.delay(300).duration(600)}>
+        <Animated.View
+          style={[styles.formCard, {marginTop: 20}]}
+          entering={FadeInDown.delay(300).duration(600)}>
           <Text style={styles.sectionLabel}>Message</Text>
           <View style={styles.inputWrapper}>
             <TextInput
@@ -252,15 +284,21 @@ const SendAlertScreen = () => {
               onChangeText={setMessage}
             />
           </View>
-          
+
           {/* Quick Tags */}
           <View style={styles.quickTagsContainer}>
-            {['Please reply', 'Meeting required', 'Wellness Check', 'Urgent'].map(tag => (
-              <TouchableOpacity 
-                key={tag} 
-                onPress={() => setMessage(prev => prev + (prev ? ' ' : '') + tag)}
-                style={styles.tag}
-              >
+            {[
+              'Please reply',
+              'Meeting required',
+              'Wellness Check',
+              'Urgent',
+            ].map(tag => (
+              <TouchableOpacity
+                key={tag}
+                onPress={() =>
+                  setMessage(prev => prev + (prev ? ' ' : '') + tag)
+                }
+                style={styles.tag}>
                 <Text style={styles.tagText}>+ {tag}</Text>
               </TouchableOpacity>
             ))}
@@ -268,17 +306,25 @@ const SendAlertScreen = () => {
         </Animated.View>
 
         {/* FOOTER BUTTON */}
-        <Animated.View entering={FadeInUp.delay(400)} style={{ marginBottom: 40 }}>
-          <TouchableOpacity 
+        <Animated.View
+          entering={FadeInUp.delay(400)}
+          style={{marginBottom: 40}}>
+          <TouchableOpacity
             style={[
-              styles.submitButton, 
+              styles.submitButton,
               (sending || !selectedStudentId) && styles.disabledButton,
-              { backgroundColor: severity === 'critical' ? '#EF4444' : severity === 'warning' ? '#F59E0B' : '#4F46E5' }
+              {
+                backgroundColor:
+                  severity === 'critical'
+                    ? '#EF4444'
+                    : severity === 'warning'
+                    ? '#F59E0B'
+                    : '#4F46E5',
+              },
             ]}
             onPress={handleSend}
             disabled={sending}
-            activeOpacity={0.8}
-          >
+            activeOpacity={0.8}>
             {sending ? (
               <ActivityIndicator color="#FFF" />
             ) : (
@@ -286,7 +332,6 @@ const SendAlertScreen = () => {
             )}
           </TouchableOpacity>
         </Animated.View>
-
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -333,18 +378,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#FFFFFF',
     fontWeight: 'bold',
-    marginTop: -2, 
+    marginTop: -2,
   },
-  headerIconContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+
+  headerIconImage: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    fontSize: 20,
+    marginRight: 8,
+    resizeMode: 'contain',
   },
   headerTextContainer: {
     zIndex: 2,
@@ -378,7 +419,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 4,
@@ -487,7 +528,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
     shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 10,

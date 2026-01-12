@@ -413,11 +413,6 @@ const ManualSleepTracker = ({route}: any) => {
               withHorizontalLines={true}
             />
           </View>
-          <View style={styles.chartFooter}>
-            <Text style={styles.chartNote}>
-              📊 Recommended: 7-9 hours per night
-            </Text>
-          </View>
         </View>
       )}
 

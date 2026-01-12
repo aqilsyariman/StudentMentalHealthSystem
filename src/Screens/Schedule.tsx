@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,12 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  Image
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
-import { useNavigation } from '@react-navigation/native'; // Added navigation import
+import {useNavigation} from '@react-navigation/native'; // Added navigation import
 
 // --- Interfaces ---
 interface Student {
@@ -42,23 +43,23 @@ interface ScheduleData {
 // --- Components ---
 
 // Updated Header with Back Button
-const ModernHeader = ({ title, subtitle }: { title: string; subtitle: string }) => {
+const ModernHeader = ({title, subtitle}: {title: string; subtitle: string}) => {
   const navigation = useNavigation();
 
   return (
     <View style={styles.headerContainer}>
       {/* Top Row: Back Button & Icon */}
       <View style={styles.headerTopRow}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        
-        <View style={styles.headerIconContainer}>
-          <Text style={styles.headerIcon}>📅</Text>
-        </View>
+
+        <Image
+          source={require('../Assets/schedule.png')}
+          style={styles.headerIconImage}
+        />
       </View>
 
       {/* Title Section */}
@@ -79,19 +80,23 @@ const InputField = ({
   onChangeText,
   placeholder,
   multiline = false,
-  icon,
+
 }: {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
   multiline?: boolean;
-  icon: string;
+  
 }) => (
   <View style={styles.inputWrapper}>
     <Text style={styles.inputLabel}>{label}</Text>
-    <View style={[styles.inputContainer, multiline && styles.inputContainerMultiline]}>
-      <Text style={styles.inputIcon}>{icon}</Text>
+    <View
+      style={[
+        styles.inputContainer,
+        multiline && styles.inputContainerMultiline,
+      ]}>
+
       <TextInput
         style={[styles.input, multiline && styles.textArea]}
         value={value}
@@ -127,11 +132,13 @@ export default function ScheduleScreen() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchingStudents, setFetchingStudents] = useState(true);
-  
+
   // UI State
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
-  const [currentField, setCurrentField] = useState<'date' | 'start' | 'end' | null>(null);
+  const [currentField, setCurrentField] = useState<
+    'date' | 'start' | 'end' | null
+  >(null);
   const [showStudentModal, setShowStudentModal] = useState(false);
 
   // --- Effects ---
@@ -144,7 +151,7 @@ export default function ScheduleScreen() {
       try {
         const snapshot = await firestore()
           .collection('students')
-          .where('counselorId', '==', currentUser.uid) 
+          .where('counselorId', '==', currentUser.uid)
           .get();
 
         const studentList = snapshot.docs.map(doc => ({
@@ -153,11 +160,11 @@ export default function ScheduleScreen() {
           email: doc.data().email || '',
           photoURL: doc.data().photoURL,
         })) as Student[];
-        
+
         setStudents(studentList);
       } catch (error) {
-        console.error("Error fetching students:", error);
-        Alert.alert("Notice", "Could not fetch assigned students.");
+        console.error('Error fetching students:', error);
+        Alert.alert('Notice', 'Could not fetch assigned students.');
       } finally {
         setFetchingStudents(false);
       }
@@ -184,15 +191,21 @@ export default function ScheduleScreen() {
   const onDateChange = (event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') setShowPicker(false);
     if (selectedDate) {
-      if (currentField === 'date') setSchedule(p => ({ ...p, date: selectedDate }));
-      else if (currentField === 'start') setSchedule(p => ({ ...p, startTime: selectedDate }));
-      else if (currentField === 'end') setSchedule(p => ({ ...p, endTime: selectedDate }));
+      if (currentField === 'date')
+        setSchedule(p => ({...p, date: selectedDate}));
+      else if (currentField === 'start')
+        setSchedule(p => ({...p, startTime: selectedDate}));
+      else if (currentField === 'end')
+        setSchedule(p => ({...p, endTime: selectedDate}));
     }
   };
 
   const handleSubmit = async () => {
     if (!schedule.title || !schedule.studentId) {
-      Alert.alert('Missing Info', 'Please fill in the Title and select a Student.');
+      Alert.alert(
+        'Missing Info',
+        'Please fill in the Title and select a Student.',
+      );
       return;
     }
 
@@ -200,20 +213,22 @@ export default function ScheduleScreen() {
     const currentUser = auth().currentUser;
 
     try {
-      await firestore().collection('schedules').add({
-        title: schedule.title,
-        place: schedule.place,
-        reason: schedule.reason,
-        meetingWith: schedule.meetingWith,
-        date: firestore.Timestamp.fromDate(schedule.date),
-        startTime: firestore.Timestamp.fromDate(schedule.startTime),
-        endTime: firestore.Timestamp.fromDate(schedule.endTime),
-        counselorId: currentUser?.uid,
-        studentId: schedule.studentId,
-        studentName: schedule.studentName,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-        status: 'upcoming'
-      });
+      await firestore()
+        .collection('schedules')
+        .add({
+          title: schedule.title,
+          place: schedule.place,
+          reason: schedule.reason,
+          meetingWith: schedule.meetingWith,
+          date: firestore.Timestamp.fromDate(schedule.date),
+          startTime: firestore.Timestamp.fromDate(schedule.startTime),
+          endTime: firestore.Timestamp.fromDate(schedule.endTime),
+          counselorId: currentUser?.uid,
+          studentId: schedule.studentId,
+          studentName: schedule.studentName,
+          createdAt: firestore.FieldValue.serverTimestamp(),
+          status: 'upcoming',
+        });
 
       Alert.alert('Success', 'Schedule created successfully!');
       setSchedule(prev => ({
@@ -233,27 +248,48 @@ export default function ScheduleScreen() {
 
   // --- Render Helpers ---
 
-  const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
-  const formatTime = (date: Date) => date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const formatDate = (date: Date) =>
+    date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      weekday: 'short',
+    });
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
-      
+
       <ModernHeader title="New Session" subtitle="Schedule a meeting" />
 
-      <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
+      <ScrollView
+        style={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}>
         {/* Student Selector Card */}
-        <TouchableOpacity style={styles.studentSelectorCard} onPress={() => setShowStudentModal(true)} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={styles.studentSelectorCard}
+          onPress={() => setShowStudentModal(true)}
+          activeOpacity={0.9}>
           <View>
             <Text style={styles.cardLabel}>Student</Text>
-            <Text style={[styles.studentSelectorText, !schedule.studentName && styles.placeholderText]}>
+            <Text
+              style={[
+                styles.studentSelectorText,
+                !schedule.studentName && styles.placeholderText,
+              ]}>
               {schedule.studentName || 'Select Assigned Student'}
             </Text>
           </View>
           <View style={styles.arrowContainer}>
-             <Text style={styles.arrowText}>↓</Text>
+            <Text style={styles.arrowText}>↓</Text>
           </View>
         </TouchableOpacity>
 
@@ -261,13 +297,21 @@ export default function ScheduleScreen() {
           {/* Meeting Type Chips */}
           <Text style={styles.sectionLabel}>Meeting With</Text>
           <View style={styles.chipRow}>
-            {['Counselor', 'Doctor', 'Other'].map((type) => (
+            {['Counselor', 'Doctor', 'Other'].map(type => (
               <TouchableOpacity
                 key={type}
-                style={[styles.chip, schedule.meetingWith === type && styles.chipActive]}
-                onPress={() => setSchedule(p => ({ ...p, meetingWith: type as any }))}
-              >
-                <Text style={[styles.chipText, schedule.meetingWith === type && styles.chipTextActive]}>
+                style={[
+                  styles.chip,
+                  schedule.meetingWith === type && styles.chipActive,
+                ]}
+                onPress={() =>
+                  setSchedule(p => ({...p, meetingWith: type as any}))
+                }>
+                <Text
+                  style={[
+                    styles.chipText,
+                    schedule.meetingWith === type && styles.chipTextActive,
+                  ]}>
                   {type === 'Counselor' ? 'Me' : type}
                 </Text>
               </TouchableOpacity>
@@ -280,46 +324,58 @@ export default function ScheduleScreen() {
             label="Title"
             placeholder="e.g. Weekly Review"
             value={schedule.title}
-            onChangeText={(t) => setSchedule(p => ({ ...p, title: t }))}
-            icon="✨"
+            onChangeText={t => setSchedule(p => ({...p, title: t}))}
+  
           />
 
           <InputField
             label="Location"
             placeholder="e.g. Room 302 / Online"
             value={schedule.place}
-            onChangeText={(t) => setSchedule(p => ({ ...p, place: t }))}
-            icon="📍"
+            onChangeText={t => setSchedule(p => ({...p, place: t}))}
+
           />
 
           {/* Date & Time Row */}
           <View style={styles.row}>
-            <TouchableOpacity style={styles.dateTimeBox} onPress={() => openPicker('date')}>
-               <Text style={styles.dateTimeLabel}>Date</Text>
-               <Text style={styles.dateTimeValue}>{formatDate(schedule.date)}</Text>
+            <TouchableOpacity
+              style={styles.dateTimeBox}
+              onPress={() => openPicker('date')}>
+              <Text style={styles.dateTimeLabel}>Date</Text>
+              <Text style={styles.dateTimeValue}>
+                {formatDate(schedule.date)}
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.row}>
-            <TouchableOpacity style={[styles.dateTimeBox, { flex: 1, marginRight: 8 }]} onPress={() => openPicker('start')}>
-               <Text style={styles.dateTimeLabel}>Start</Text>
-               <Text style={styles.dateTimeValue}>{formatTime(schedule.startTime)}</Text>
+            <TouchableOpacity
+              style={[styles.dateTimeBox, {flex: 1, marginRight: 8}]}
+              onPress={() => openPicker('start')}>
+              <Text style={styles.dateTimeLabel}>Start</Text>
+              <Text style={styles.dateTimeValue}>
+                {formatTime(schedule.startTime)}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.dateTimeBox, { flex: 1, marginLeft: 8 }]} onPress={() => openPicker('end')}>
-               <Text style={styles.dateTimeLabel}>End</Text>
-               <Text style={styles.dateTimeValue}>{formatTime(schedule.endTime)}</Text>
+            <TouchableOpacity
+              style={[styles.dateTimeBox, {flex: 1, marginLeft: 8}]}
+              onPress={() => openPicker('end')}>
+              <Text style={styles.dateTimeLabel}>End</Text>
+              <Text style={styles.dateTimeValue}>
+                {formatTime(schedule.endTime)}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ height: 16 }} />
+          <View style={{height: 16}} />
 
           <InputField
             label="Notes"
             placeholder="Tap to add details..."
             value={schedule.reason}
-            onChangeText={(t) => setSchedule(p => ({ ...p, reason: t }))}
+            onChangeText={t => setSchedule(p => ({...p, reason: t}))}
             multiline
-            icon="📝"
+
           />
         </View>
 
@@ -328,41 +384,58 @@ export default function ScheduleScreen() {
           style={[styles.submitButton, loading && styles.disabledButton]}
           onPress={handleSubmit}
           disabled={loading}
-          activeOpacity={0.8}
-        >
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitButtonText}>Confirm Schedule</Text>}
+          activeOpacity={0.8}>
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.submitButtonText}>Confirm Schedule</Text>
+          )}
         </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
+        <View style={{height: 40}} />
       </ScrollView>
 
       {/* --- Student Modal --- */}
-      <Modal visible={showStudentModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={showStudentModal}
+        animationType="slide"
+        presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Assigned Student</Text>
-            <TouchableOpacity onPress={() => setShowStudentModal(false)} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={() => setShowStudentModal(false)}
+              style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-          
+
           {fetchingStudents ? (
-            <ActivityIndicator size="large" color="#4F46E5" style={{ marginTop: 40 }} />
+            <ActivityIndicator
+              size="large"
+              color="#4F46E5"
+              style={{marginTop: 40}}
+            />
           ) : (
             <FlatList
               data={students}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 16 }}
-              renderItem={({ item }) => (
+              keyExtractor={item => item.id}
+              contentContainerStyle={{padding: 16}}
+              renderItem={({item}) => (
                 <TouchableOpacity
                   style={styles.studentItem}
                   onPress={() => {
-                    setSchedule(p => ({ ...p, studentId: item.id, studentName: item.fullName }));
+                    setSchedule(p => ({
+                      ...p,
+                      studentId: item.id,
+                      studentName: item.fullName,
+                    }));
                     setShowStudentModal(false);
-                  }}
-                >
+                  }}>
                   <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text>
+                    <Text style={styles.avatarText}>
+                      {item.fullName.charAt(0).toUpperCase()}
+                    </Text>
                   </View>
                   <View style={styles.studentInfo}>
                     <Text style={styles.studentName}>{item.fullName}</Text>
@@ -373,8 +446,12 @@ export default function ScheduleScreen() {
               )}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateText}>No assigned students found.</Text>
-                  <Text style={styles.emptyStateSubtext}>Ensure students have your ID in their profile.</Text>
+                  <Text style={styles.emptyStateText}>
+                    No assigned students found.
+                  </Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Ensure students have your ID in their profile.
+                  </Text>
                 </View>
               }
             />
@@ -391,8 +468,14 @@ export default function ScheduleScreen() {
                 <TouchableOpacity onPress={() => setShowPicker(false)}>
                   <Text style={styles.pickerCancel}>Cancel</Text>
                 </TouchableOpacity>
-                <Text style={styles.pickerTitle}>{pickerMode === 'date' ? 'Select Date' : 'Select Time'}</Text>
-                <TouchableOpacity onPress={() => { setShowPicker(false); setCurrentField(null); }}>
+                <Text style={styles.pickerTitle}>
+                  {pickerMode === 'date' ? 'Select Date' : 'Select Time'}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPicker(false);
+                    setCurrentField(null);
+                  }}>
                   <Text style={styles.pickerDone}>Done</Text>
                 </TouchableOpacity>
               </View>
@@ -434,7 +517,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 10,
   },
-  
+
   // --- Updated Header Styles ---
   headerContainer: {
     backgroundColor: '#4F46E5',
@@ -466,7 +549,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#FFFFFF',
     fontWeight: 'bold',
-    marginTop: -2, 
+    marginTop: -2,
   },
   headerIconContainer: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -476,8 +559,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerIcon: {
-    fontSize: 20,
+  headerIconImage: {
+    width: 40,
+    height: 40,
+    marginRight: 8,
+    resizeMode: 'contain',
+    marginTop: 10,
   },
   headerTextContainer: {
     zIndex: 2,
@@ -516,7 +603,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 20,
     shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: {width: 0, height: 10},
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 8,
@@ -557,7 +644,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     shadowColor: '#64748B',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.05,
     shadowRadius: 12,
     elevation: 4,
@@ -568,7 +655,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginBottom: 12,
   },
-  
+
   // Chips
   chipRow: {
     flexDirection: 'row',
@@ -674,7 +761,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
     shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 10,
@@ -724,7 +811,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,

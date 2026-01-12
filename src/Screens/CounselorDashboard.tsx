@@ -354,7 +354,7 @@ const CounselorDashboard = ({navigation}: Props) => {
             value={avgWellnessScore !== null ? avgWellnessScore : '--'}
             unit="/100"
             subLabel={getWellnessLabel(avgWellnessScore)}
-            icon={require('../Assets/services.png')}
+            icon={require('../Assets/health.png')}
             color={getLabelColor(avgWellnessScore)}
             applyColorToValue={true}
             onPress={() => navigation.navigate('AvgWellnessScore')}
